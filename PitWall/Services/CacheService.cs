@@ -3,3 +3,8 @@ using System.Collections.Generic;
 using System.Text;
 
 namespace PitWall.Services;
+
+public class CacheService
+{
+
+}
