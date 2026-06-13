@@ -3,6 +3,7 @@ using PitWall.Models;
 using System.Linq.Expressions;
 using System.Net.Http;
 using System.Text.Json;
+using System.Diagnostics;
 
 namespace PitWall.Services;
 
@@ -18,11 +19,17 @@ public class OpenF1APIService
 
     public async Task<List<T>> FetchDataAsync<T>(APIParam parameters)
     {
+        
         string fullUrl = $"{_baseUrl}{parameters}";
+
+        Debug.WriteLine(fullUrl);
+        Debug.WriteLine($"Parameters: {parameters}");
 
         string response = await _httpClient.GetStringAsync(fullUrl);
 
         //Need error for if the endpoint doesn't match the model.
+
+        Debug.WriteLine(response);
 
         return JsonSerializer.Deserialize<List<T>>(response, JsonPolicies.OpenF1Options) ?? [];
     }

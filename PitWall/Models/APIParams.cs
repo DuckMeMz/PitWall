@@ -1,36 +1,40 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.WebUtilities;
 namespace PitWall.Models;
 
 public record APIParam
 {
     public OpenF1APIEndpoint EndPoint { get; init; }
-    public Dictionary<string, string?> Filters { get; init; } = new();
+    public List<Filter> Filters { get; init; } = new();
 
     public APIParam(OpenF1APIEndpoint endpoint)
     {
         EndPoint = endpoint;
     }
 
-    public APIParam WithSession(SessionKey sessionKey) => AddFilter("session_key", sessionKey.Value.ToString());
-    public APIParam WithDriver(DriverNumber driverNumber) => AddFilter("driver_number", driverNumber.Value.ToString());
-    public APIParam WithOperator(string filterOperator, string value) => AddFilter(filterOperator, value);
+    public APIParam WithSession(SessionKey sessionKey) =>
+        WithFilter(Filter.Equal(ApiFields.SessionKey, sessionKey));
+
+    public APIParam WithMeeting(MeetingKey meetingKey) =>
+        WithFilter(Filter.Equal(ApiFields.MeetingKey, meetingKey));
+
+    public APIParam WithDriver(DriverNumber driverNumber) =>
+        WithFilter(Filter.Equal(ApiFields.DriverNumber, driverNumber));
 
 
-    public APIParam WithFilters(IEnumerable<Filter> filters)
+    public APIParam WithFilter(Filter filter)
     {
-        foreach (var filter in filters)
-        {
-            AddFilter(filter.Key, filter.Value);
-        }
+        Filters.Add(filter);
         return this;
     }
 
-    private APIParam AddFilter(string key, string value)
+    public APIParam WithFilters(IEnumerable<Filter> filters)
     {
-        Filters[key] = value;
+        Filters.AddRange(filters);
         return this;
     }
 
@@ -38,8 +42,10 @@ public record APIParam
     {
         string baseEndpoint = EndPoint.ToUrlString();
 
-        string FinalURL = QueryHelpers.AddQueryString(baseEndpoint, Filters);
+        string FinalURL = $"{baseEndpoint}?{string.Join("&", Filters.Select(f => f.Expression))}";
+
         Debug.WriteLine($"Final URL: {FinalURL}");
+
         return FinalURL;
     }
 }

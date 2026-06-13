@@ -8,3 +8,12 @@ public record TeamRadio
     public DriverNumber DriverNumber { get; init; }
     public string RecordingUrl { get; init; } = string.Empty;
 }
+
+public static class TeamRadioFields
+{
+    public static readonly ApiField<DateTimeOffset> Timestamp = ApiFields.Timestamp;
+    public static readonly ApiField<MeetingKey> MeetingKey = ApiFields.MeetingKey;
+    public static readonly ApiField<SessionKey> SessionKey = ApiFields.SessionKey;
+    public static readonly ApiField<DriverNumber> DriverNumber = ApiFields.DriverNumber;
+    public static readonly ApiField<string> RecordingUrl = new("recording_url");
+}

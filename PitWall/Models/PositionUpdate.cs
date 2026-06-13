@@ -8,3 +8,13 @@ public record PositionUpdate
     public DriverNumber DriverNumber { get; init; }
     public Position Position { get; init; }
 }
+
+public static class PositionFields
+{
+    public static readonly ApiField<DateTimeOffset> Timestamp = ApiFields.Timestamp;
+    public static readonly ApiField<MeetingKey> MeetingKey = ApiFields.MeetingKey;
+    public static readonly ApiField<SessionKey> SessionKey = ApiFields.SessionKey;
+    public static readonly ApiField<DriverNumber> DriverNumber = ApiFields.DriverNumber;
+
+    public static readonly ApiField<Position> Position = new("position");
+}

@@ -9,3 +9,13 @@ public class Overtake
     public DriverNumber OvertakingDriverNumber { get; init; }
     public Position Position { get; init; } //The position of the overtaking driver once the overtake was complete
 }
+
+public static class OvertakeFields
+{
+    public static readonly ApiField<DateTimeOffset> Timestamp = ApiFields.Timestamp;
+    public static readonly ApiField<MeetingKey> MeetingKey = ApiFields.MeetingKey;
+    public static readonly ApiField<SessionKey> SessionKey = ApiFields.SessionKey;
+    public static readonly ApiField<DriverNumber> OvertakenDriverNumber = new("overtaken_driver_number");
+    public static readonly ApiField<DriverNumber> OvertakingDriverNumber = new("overtaking_driver_number");
+    public static readonly ApiField<Position> Position = new("position");
+}
