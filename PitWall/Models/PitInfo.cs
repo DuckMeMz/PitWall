@@ -10,3 +10,15 @@ public record PitInfo
     public double StopDuration { get; init; }
     public LapNumber LapNumber { get; init; } //The lap that the driver came in on and completed by driving through the pits.
 }
+
+public static class PitFields
+{
+    public static readonly ApiField<DateTimeOffset> Timestamp = ApiFields.Timestamp;
+    public static readonly ApiField<MeetingKey> MeetingKey = ApiFields.MeetingKey;
+    public static readonly ApiField<SessionKey> SessionKey = ApiFields.SessionKey;
+    public static readonly ApiField<DriverNumber> DriverNumber = ApiFields.DriverNumber;
+
+    public static readonly ApiField<double> LaneDuration = new("lane_duration");
+    public static readonly ApiField<double> StopDuration = new("stop_duration");
+    public static readonly ApiField<LapNumber> LapNumber = new("lap_number");
+}

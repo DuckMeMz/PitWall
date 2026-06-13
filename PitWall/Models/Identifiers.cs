@@ -1,17 +1,45 @@
 ﻿using System.ComponentModel;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace PitWall.Models;
 
-public readonly record struct MeetingKey(int Value);
-public readonly record struct SessionKey(int Value);
-public readonly record struct CircuitKey(int Value);
-public readonly record struct CountryKey(int Value);
+public readonly record struct MeetingKey(int Value): IApiQueryValue
+{
+    public string ToQueryValue() => Value.ToString();
+};
 
-public readonly record struct DriverNumber(byte Value);
-public readonly record struct TeamName(string Value);
+public readonly record struct SessionKey(int Value) : IApiQueryValue
+{
+    public string ToQueryValue() => Value.ToString();
+};
 
-public readonly record struct LapNumber(int Value);
-public readonly record struct Position(byte Value);
+public readonly record struct CircuitKey(int Value) : IApiQueryValue
+{
+    public string ToQueryValue() => Value.ToString();
+};
+public readonly record struct CountryKey(int Value) : IApiQueryValue
+{
+    public string ToQueryValue() => Value.ToString();
+};
+
+public readonly record struct DriverNumber(byte Value) : IApiQueryValue
+{
+    public string ToQueryValue() => Value.ToString();
+};
+public readonly record struct TeamName(string Value) : IApiQueryValue
+{
+    public string ToQueryValue() => Value.ToString();
+};
+
+public readonly record struct LapNumber(int Value) : IApiQueryValue
+{
+    public string ToQueryValue() => Value.ToString();
+};
+public readonly record struct Position(byte Value) : IApiQueryValue
+{
+    public string ToQueryValue() => Value.ToString();
+};
 
 public enum DrsState : byte
 {
@@ -70,36 +98,59 @@ public enum RaceControlScope : byte
 public enum FlagType : byte
 {
     None = 0,
+
+    [ApiQueryValue("CLEAR")]
     Clear,
+    [ApiQueryValue("GREEN")]
     Green,
+    [ApiQueryValue("YELLOW")]
     Yellow,
+    [ApiQueryValue("DOUBLE%20YELLOW")]
     DoubleYellow,
+    [ApiQueryValue("RED")]
     Red,
+    [ApiQueryValue("BLUE")]
     Blue,
+    [ApiQueryValue("WHITE")]
     White, //Slow car
+    [ApiQueryValue("BLACK")]
     Black, //Dsq
+    [ApiQueryValue("BLACK%20AND%20WHITE")]
     BlackAndWhite, //Track limits
+    [ApiQueryValue("BLACK%20AND%20ORANGE")]
     BlackAndOrange, //Mech fail
+    [ApiQueryValue("CHEQUERED")]
     Chequered,
+
     Unknown
 }
 
 public enum SessionType : byte
 {
     Unknown = 0,
+
+    [ApiQueryValue("PRACTICE")]
     Practice,
+    [ApiQueryValue("QUALIFYING")]
     Qualifying,
+    [ApiQueryValue("SPRINT")]
     Sprint,
+    [ApiQueryValue("RACE")]
     Race
 }
 
 public enum TyreCompound : byte
 {
     Unknown = 0,
+    [ApiQueryValue("SOFT")]
     Soft,
+    [ApiQueryValue("MEDIUM")]
     Medium,
+    [ApiQueryValue("HARD")]
     Hard,
+    [ApiQueryValue("INTERMEDIATE")]
     Intermediate,
+    [ApiQueryValue("WET")]
     Wet
 }
 
@@ -126,7 +177,77 @@ public enum OpenF1APIEndpoint : byte
     [Description("weather")] Weather
 }
 
-public readonly record struct Filter(string Field, string Operator, string Value)
+public readonly record struct Filter(string Expression)
 {
-    public string Key => $"{Field}{Operator}";
+    public static Filter Equal<T>(ApiField<T> field, T value) => 
+        new($"{field}={Format(value)}");
+
+    public static Filter GreaterThan<T>(ApiField<T> field, T value) =>
+        new($"{field}>{Format(value)}");
+
+    public static Filter GreaterThanOrEqual<T>(ApiField<T> field, T value) =>
+        new($"{field}>={Format(value)}");
+
+    public static Filter LessThan<T>(ApiField<T> field, T value) =>
+        new($"{field}<{Format(value)}");
+
+    public static Filter LessThanOrEqual<T>(ApiField<T> field, T value) =>
+        new($"{field}<={Format(value)}");
+
+    private static string Format<T>(T value)
+    {
+        switch(value)
+        {
+            case null:
+                return string.Empty;
+
+            case IApiQueryValue queryValue:
+                return queryValue.ToQueryValue();
+
+            case bool boolean:
+                return boolean ? "true" : "false";
+
+            case Enum enumValue:
+                return enumValue.ToApiQueryValue();
+
+            case IFormattable formattable:
+                return formattable.ToString(null, CultureInfo.InvariantCulture);
+
+            default:
+                return value.ToString() ?? string.Empty;
+        }
+    }
+}
+
+public readonly record struct ApiField<T>(string Name);
+
+[AttributeUsage(AttributeTargets.Field)]
+public class ApiQueryValueAttribute : Attribute
+{
+    public string Value { get; }
+
+    public ApiQueryValueAttribute(string value)
+    {
+        Value = value;
+    }
+}
+
+public static class ApiQueryValueExtensions
+{
+    public static string ToApiQueryValue(this Enum value)
+    {
+        var member = value.GetType().GetMember(value.ToString()).FirstOrDefault();
+
+        var attribute = member?
+            .GetCustomAttributes(typeof(ApiQueryValueAttribute), false)
+            .OfType<ApiQueryValueAttribute>()
+            .FirstOrDefault();
+
+        return attribute?.Value ?? value.ToString();
+    }
+}
+
+public interface IApiQueryValue
+{
+    string ToQueryValue();
 }
