@@ -1,9 +1,11 @@
-﻿using PitWall.Configuration;
+﻿using System.Net.Http;
+using Polly;
 using PitWall.Models;
-using System.Linq.Expressions;
-using System.Net.Http;
-using System.Text.Json;
 using System.Diagnostics;
+using PitWall.Services.Exceptions;
+using System.Text.Json.Serialization;
+using System.Text.Json;
+using PitWall.Configuration;
 
 namespace PitWall.Services;
 
@@ -17,20 +19,32 @@ public class OpenF1APIService
         _httpClient = httpClient;
     }
 
-    public async Task<List<T>> FetchDataAsync<T>(APIParam parameters)
+    public async Task<IReadOnlyList<T>> FetchDataAsync<T>(APIParam parameters, CancellationToken cancellationToken = default)
     {
-        
-        string fullUrl = $"{_baseUrl}{parameters}";
+        string finalUrl = $"{_baseUrl}{parameters.GetRelativeUrl()}";
 
-        Debug.WriteLine(fullUrl);
-        Debug.WriteLine($"Parameters: {parameters}");
+        ResiliencePipeline pipeline = new ResiliencePipelineBuilder().Build();
 
-        string response = await _httpClient.GetStringAsync(fullUrl);
+        Debug.WriteLine($"Fetching: {finalUrl}");
 
-        //Need error for if the endpoint doesn't match the model.
+        HttpResponseMessage response = await pipeline.ExecuteAsync(
+            async token => await _httpClient.GetAsync(finalUrl, cancellationToken),
+            cancellationToken);
 
-        Debug.WriteLine(response);
+        string json = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        return JsonSerializer.Deserialize<List<T>>(response, JsonPolicies.OpenF1Options) ?? [];
+        if(!response.IsSuccessStatusCode)
+        {
+            throw new OpenF1RequestException(finalUrl, response.StatusCode, json);
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<T>>(json, JsonPolicies.OpenF1Options) ?? [];
+        }
+        catch(JsonException jsonException)
+        {
+            throw new OpenF1DeserializeException(finalUrl, typeof(T), jsonException);
+        }
     }
 }

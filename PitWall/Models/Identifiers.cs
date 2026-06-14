@@ -1,7 +1,8 @@
 ﻿using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json.Serialization;
-
+using System.Windows.Automation.Provider;
 using PitWall.Converters;
 
 namespace PitWall.Models;
@@ -9,47 +10,86 @@ namespace PitWall.Models;
 [JsonConverter(typeof(MeetingKeyConverter))]
 public readonly record struct MeetingKey(int Value): IApiQueryValue
 {
-    public static MeetingKey Latest => new(-1);
-    public string ToQueryValue() => Value == -1 ? "latest" : Value.ToString();
+    private const int LatestValue = -1;
+    public static MeetingKey Latest => new(LatestValue);
+    public string ToQueryValue() => Value == LatestValue ? "latest" : Value.ToString();
+
+    public override string ToString() => Value.ToString();
 };
 
 [JsonConverter(typeof(SessionKeyConverter))]
 public readonly record struct SessionKey(int Value) : IApiQueryValue
 {
-    public static SessionKey Latest => new(-1);
-    public string ToQueryValue() => Value == -1 ? "latest" : Value.ToString();
+    private const int LatestValue = -1;
+    public static SessionKey Latest => new(LatestValue);
+    public string ToQueryValue() => Value == LatestValue ? "latest" : Value.ToString();
+
+    public override string ToString() => Value.ToString();
 };
 [JsonConverter(typeof(CircuitKeyConverter))]
 public readonly record struct CircuitKey(int Value) : IApiQueryValue
 {
     public string ToQueryValue() => Value.ToString();
+
+    public override string ToString() => Value.ToString();
 };
 [JsonConverter(typeof(CountryKeyConverter))]
 public readonly record struct CountryKey(int Value) : IApiQueryValue
 {
     public string ToQueryValue() => Value.ToString();
+
+    public override string ToString() => Value.ToString();
 };
 [JsonConverter(typeof(DriverNumberConverter))]
 public readonly record struct DriverNumber(byte Value) : IApiQueryValue
 {
     public string ToQueryValue() => Value.ToString();
+
+    public override string ToString() => Value.ToString();
 };
 [JsonConverter(typeof(TeamNameConverter))]
 public readonly record struct TeamName(string Value) : IApiQueryValue
 {
     public string ToQueryValue() => Value.ToString();
+
+    public override string ToString() => Value;
 };
 [JsonConverter(typeof(LapNumberConverter))]
 public readonly record struct LapNumber(int Value) : IApiQueryValue
 {
     public string ToQueryValue() => Value.ToString();
+
+    public override string ToString() => Value.ToString();
 };
 [JsonConverter(typeof(PositionConverter))]
 public readonly record struct Position(byte Value) : IApiQueryValue
 {
     public string ToQueryValue() => Value.ToString();
+
+    public override string ToString() => Value.ToString();
 };
 
+[JsonConverter(typeof(TimingGapConverter))]
+public readonly record struct TimingGap(double? Seconds, string? RawValue) : IApiQueryValue
+{
+    public string ToQueryValue()
+    {
+        if (Seconds.HasValue)
+            return Seconds.Value.ToString();
+
+        return RawValue ?? string.Empty;
+    }
+
+    public override string ToString()
+    {
+        if (Seconds.HasValue)
+            return Seconds.Value.ToString();
+
+        return RawValue ?? string.Empty;
+    }
+}
+
+[JsonConverter(typeof(ApiEnumJsonConverter<DrsState>))]
 public enum DrsState : byte
 {
     Off = 0,
@@ -67,6 +107,7 @@ public enum DrsState : byte
     OnAlternativeB = 14
 }
 
+[JsonConverter(typeof(ApiEnumJsonConverter<SectorSegments>))]
 public enum SectorSegments : ushort 
 {
     NotAvailable = 0,
@@ -79,13 +120,17 @@ public enum SectorSegments : ushort
     Unknown2068 = 2068
 }
 
-public readonly record struct Color(string HexCode)
+[JsonConverter(typeof(ColorConverter))]
+public readonly record struct Color(string HexCode) : IApiQueryValue
 {
     public byte R => Convert.ToByte(HexCode.Substring(0, 2), 16);
     public byte G => Convert.ToByte(HexCode.Substring(2, 2), 16);
     public byte B => Convert.ToByte(HexCode.Substring(4, 2), 16);
+
+    public string ToQueryValue() => HexCode;
 }
 
+[JsonConverter(typeof(ApiEnumJsonConverter<RaceControlCategory>))]
 public enum RaceControlCategory : byte
 {
     Unknown = 0,
@@ -96,6 +141,7 @@ public enum RaceControlCategory : byte
     SafetyCar
 }
 
+[JsonConverter(typeof(ApiEnumJsonConverter<RaceControlScope>))]
 public enum RaceControlScope : byte
 {
     Unknown = 0,
@@ -104,6 +150,7 @@ public enum RaceControlScope : byte
     Sector
 }
 
+[JsonConverter(typeof(ApiEnumJsonConverter<FlagType>))]
 public enum FlagType : byte
 {
     None = 0,
@@ -114,7 +161,7 @@ public enum FlagType : byte
     Green,
     [ApiQueryValue("YELLOW")]
     Yellow,
-    [ApiQueryValue("DOUBLE%20YELLOW")]
+    [ApiQueryValue("DOUBLE YELLOW")]
     DoubleYellow,
     [ApiQueryValue("RED")]
     Red,
@@ -124,9 +171,9 @@ public enum FlagType : byte
     White, //Slow car
     [ApiQueryValue("BLACK")]
     Black, //Dsq
-    [ApiQueryValue("BLACK%20AND%20WHITE")]
+    [ApiQueryValue("BLACK AND WHITE")]
     BlackAndWhite, //Track limits
-    [ApiQueryValue("BLACK%20AND%20ORANGE")]
+    [ApiQueryValue("BLACK AND ORANGE")]
     BlackAndOrange, //Mech fail
     [ApiQueryValue("CHEQUERED")]
     Chequered,
@@ -134,20 +181,24 @@ public enum FlagType : byte
     Unknown
 }
 
+[JsonConverter(typeof(ApiEnumJsonConverter<SessionType>))]
 public enum SessionType : byte
 {
     Unknown = 0,
 
-    [ApiQueryValue("PRACTICE")]
+    [ApiQueryValue("Practice")]
     Practice,
-    [ApiQueryValue("QUALIFYING")]
+    [ApiQueryValue("Qualifying")]
     Qualifying,
-    [ApiQueryValue("SPRINT")]
+    [ApiQueryValue("Sprint")]
     Sprint,
-    [ApiQueryValue("RACE")]
+    [ApiQueryValue("Sprint Qualifying")]
+    SprintQualifying,
+    [ApiQueryValue("Race")]
     Race
 }
 
+[JsonConverter(typeof(ApiEnumJsonConverter<TyreCompound>))]
 public enum TyreCompound : byte
 {
     Unknown = 0,
@@ -177,6 +228,7 @@ public enum OpenF1APIEndpoint : byte
     [Description("meetings")] Meetings,
     [Description("overtakes")] Overtakes,
     [Description("pit")] Pit,
+    [Description("position")] Position,
     [Description("race_control")] RaceControl,
     [Description("sessions")] Sessions,
     [Description("session_result")] SessionResult,
@@ -189,22 +241,27 @@ public enum OpenF1APIEndpoint : byte
 public readonly record struct Filter(string Expression)
 {
     public static Filter Equal<T>(ApiField<T> field, T value) => 
-        new($"{field}={Format(value)}");
+        new($"{field}={Encode(value)}");
 
     public static Filter NotEqual<T>(ApiField<T> field, T value) =>
-        new($"{field}!={Format(value)}");
+        new($"{field}!={Encode(value)}");
 
     public static Filter GreaterThan<T>(ApiField<T> field, T value) =>
-        new($"{field}>{Format(value)}");
+        new($"{field}>{Encode(value)}");
 
     public static Filter GreaterThanOrEqual<T>(ApiField<T> field, T value) =>
-        new($"{field}>={Format(value)}");
+        new($"{field}>={Encode(value)}");
 
     public static Filter LessThan<T>(ApiField<T> field, T value) =>
-        new($"{field}<{Format(value)}");
+        new($"{field}<{Encode(value)}");
 
     public static Filter LessThanOrEqual<T>(ApiField<T> field, T value) =>
-        new($"{field}<={Format(value)}");
+        new($"{field}<={Encode(value)}");
+
+    private static string Encode<T>(T value)
+    {
+        return Uri.EscapeDataString(Format(value));
+    }
 
     private static string Format<T>(T value)
     {
@@ -260,6 +317,8 @@ public static class ApiQueryValueExtensions
             .GetCustomAttributes(typeof(ApiQueryValueAttribute), false)
             .OfType<ApiQueryValueAttribute>()
             .FirstOrDefault();
+
+        Debug.WriteLine($"Attribute: {attribute}");
 
         return attribute?.Value ?? value.ToString();
     }

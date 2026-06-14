@@ -38,15 +38,26 @@ public record APIParam
         return this;
     }
 
-    public override string ToString()
+    public string GetRelativeUrl()
     {
         string baseEndpoint = EndPoint.ToUrlString();
 
-        string FinalURL = $"{baseEndpoint}?{string.Join("&", Filters.Select(f => f.Expression))}";
+        string RelativeUrl = Filters.Count == 0
+            ? baseEndpoint
+            : $"{baseEndpoint}?{string.Join("&", Filters.Select(f => f.Expression))}";
 
-        Debug.WriteLine($"Final URL: {FinalURL}");
+        Debug.WriteLine($"Relative Url: {RelativeUrl}");
 
-        return FinalURL;
+        return RelativeUrl;
+    }
+
+    public override string ToString()
+    {
+        var filtersText = Filters.Count > 0 ?
+            string.Join("\n", Filters.Select(fiter => $"  - {fiter.Expression}"))
+            : "  None";
+
+        return $"EndPoint: {EndPoint}{"\n"}Filters:{"\n"}{filtersText}";
     }
 }
 
