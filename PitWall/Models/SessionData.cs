@@ -1,7 +1,7 @@
 ﻿namespace PitWall.Models;
 
-public record LoadedSessionData(
-    Session Session,
+public record SessionData(
+    OpenF1Session Session,
     IReadOnlyList<Driver> Drivers,
     IReadOnlyList<PositionUpdate> Positions,
     IReadOnlyList<CarTelemetrySample> CarTelemetry,

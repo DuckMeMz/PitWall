@@ -1,6 +1,6 @@
 ﻿namespace PitWall.Models;
 
-public record Session
+public record OpenF1Session
 {
     public DateTimeOffset? TimestampStart { get; init; }
     public DateTimeOffset? TimestampEnd { get; init; }

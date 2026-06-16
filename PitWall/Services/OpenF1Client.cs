@@ -172,7 +172,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<Meeting>> GetMeetingsAsync(
+    public Task<IReadOnlyList<OpenF1Meeting>> GetMeetingsAsync(
         int? year = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
@@ -180,7 +180,7 @@ public class OpenF1Client
         return GetMeetingsAsync(CancellationToken.None, year, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<Meeting>> GetMeetingsAsync(
+    public async Task<IReadOnlyList<OpenF1Meeting>> GetMeetingsAsync(
         CancellationToken cancellationToken,
         int? year = null,
         MeetingKey? meetingKey = null,
@@ -191,7 +191,7 @@ public class OpenF1Client
         if (year.HasValue)
             filters.Add(Filter.Equal(MeetingFields.Year, year));
 
-        return await FetchEndpointAsync<Meeting>(
+        return await FetchEndpointAsync<OpenF1Meeting>(
             endPoint: OpenF1APIEndpoint.Meetings,
             meetingKey: meetingKey,
             cancellationToken: cancellationToken,
@@ -313,7 +313,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<Session>> GetSessionsAsync(
+    public Task<IReadOnlyList<OpenF1Session>> GetSessionsAsync(
         int? year = null,
         MeetingKey? meetingKey = null,
         SessionKey? sessionKey = null,
@@ -322,7 +322,7 @@ public class OpenF1Client
         return GetSessionsAsync(CancellationToken.None, year, meetingKey, sessionKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<Session>> GetSessionsAsync(
+    public async Task<IReadOnlyList<OpenF1Session>> GetSessionsAsync(
         CancellationToken cancellationToken,
         int? year = null,
         MeetingKey? meetingKey = null,
@@ -334,7 +334,7 @@ public class OpenF1Client
         if (year.HasValue)
             filters.Add(Filter.Equal(SessionFields.Year, year));
 
-        return await FetchEndpointAsync<Session>(
+        return await FetchEndpointAsync<OpenF1Session>(
             endPoint: OpenF1APIEndpoint.Sessions,
             sessionKey: sessionKey,
             meetingKey: meetingKey,
@@ -392,7 +392,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<StartingGrid>> GetStartingGridAsync(
+    public Task<IReadOnlyList<OpenF1StartingGridEntry>> GetStartingGridAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -401,14 +401,14 @@ public class OpenF1Client
         return GetStartingGridAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<StartingGrid>> GetStartingGridAsync(
+    public async Task<IReadOnlyList<OpenF1StartingGridEntry>> GetStartingGridAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<StartingGrid>(
+        return await FetchEndpointAsync<OpenF1StartingGridEntry>(
             endPoint: OpenF1APIEndpoint.StartingGrid,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,

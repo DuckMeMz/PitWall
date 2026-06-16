@@ -1,6 +1,6 @@
 ﻿namespace PitWall.Models;
 
-public record Meeting
+public record OpenF1Meeting
 {
     public MeetingKey MeetingKey { get; init; }
     public CircuitKey CircuitKey { get; init; }

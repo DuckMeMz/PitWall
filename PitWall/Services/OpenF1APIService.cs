@@ -23,7 +23,16 @@ public class OpenF1APIService
     {
         string finalUrl = $"{_baseUrl}{parameters.GetRelativeUrl()}";
 
-        ResiliencePipeline pipeline = new ResiliencePipelineBuilder().Build();
+        ResiliencePipeline<HttpResponseMessage> pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
+            .AddRetry(new Polly.Retry.RetryStrategyOptions<HttpResponseMessage>
+            {
+                ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
+                    .HandleResult(response => response.StatusCode == System.Net.HttpStatusCode.TooManyRequests),
+                MaxRetryAttempts = 5,
+                Delay = TimeSpan.FromSeconds(1),
+                BackoffType = DelayBackoffType.Exponential
+            })
+            .Build();
 
         Debug.WriteLine($"Fetching: {finalUrl}");
 
