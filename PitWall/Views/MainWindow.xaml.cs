@@ -1,6 +1,7 @@
 ﻿using PitWall.Models;
 using PitWall.Services;
 using PitWall.ViewModels;
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
@@ -24,8 +25,6 @@ namespace PitWall
             InitializeComponent();
 
             DataContext = new MainViewModel();
-
-            Loaded += async (s, e) => await Testy();
         }
 
         public async Task Testy()
@@ -35,52 +34,18 @@ namespace PitWall
             OpenF1Client client = new OpenF1Client(apiService);
             SessionCatalogService sessionCatalog = new SessionCatalogService(client);
             SessionDataService sessionData = new SessionDataService(client, sessionCatalog);
+            ReplayFrameBuilder replayFrameBuilder = new ReplayFrameBuilder();
 
-            SeasonCalendar calendar = await sessionCatalog.GetCalendarAsync(2024);
-
-            foreach (CalendarMeeting meeting in calendar.Meetings)
+            CalendarMeeting silverstoneMeeting = await sessionCatalog.GetCalendarMeetingAsync(2025, "silverstone");
+            OpenF1Session? silverstoneRace = silverstoneMeeting.GetMainRaceSession();
+            if(silverstoneRace is not null)
             {
-                Debug.WriteLine($"{meeting.Meeting.MeetingName} - {meeting.Meeting.MeetingKey}");
+                ReplayData silverstoneReplayData = await sessionData.LoadReplayDataAsync(
+                    silverstoneRace.SessionKey
+                );
 
-                foreach (OpenF1Session session in meeting.Sessions)
-                {
-                    Debug.WriteLine($"  {session.SessionName} - {session.SessionType} - {session.SessionKey}");
-                }
-            }
-
-            CalendarMeeting silverstone = await sessionCatalog.GetCalendarMeetingAsync(2024, "BEL");
-
-            Debug.WriteLine(silverstone.Meeting.MeetingName);
-
-            foreach (OpenF1Session session in silverstone.Sessions)
-            {
-                Debug.WriteLine($"{session.SessionName}: {session.SessionKey}");
-            }
-
-            OpenF1Session? race = silverstone.GetMainRaceSession();
-
-            if (race is null)
-            {
-                throw new InvalidOperationException("Silverstone did not contain a main race session.");
-            }
-
-            Debug.WriteLine($"Race session key: {race?.SessionKey}");
-
-            StartingGrid silverStoneStartingGrid = await sessionData.LoadStartingGrid(sessionKey: race!.SessionKey);
-
-            if (silverStoneStartingGrid.Entries.Count == 0)
-            {
-                Debug.WriteLine($"No starting grid published for {silverStoneStartingGrid.Session.CircuitShortName}, {silverStoneStartingGrid.Session.CountryName}.");
-            }
-            else
-            {
-                foreach (var entry in silverStoneStartingGrid.Entries)
-                {
-                    Debug.WriteLine(entry);
-                }
-            }
-
-            
+                IReadOnlyList<ReplayFrame> replayFrames = replayFrameBuilder.BuildFrames(silverstoneReplayData);
+            } 
         }
     }
 

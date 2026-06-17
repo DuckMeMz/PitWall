@@ -1,7 +1,8 @@
 ﻿namespace PitWall.Models;
 
-public record RaceControlMessage
+public record OpenF1RaceControlMessage
 {
+    [System.Text.Json.Serialization.JsonPropertyName("date")]
     public DateTimeOffset? Timestamp { get; init; }
     public MeetingKey MeetingKey { get; init; }
     public SessionKey SessionKey { get; init; }

@@ -1,4 +1,5 @@
 using PitWall.Models;
+using PitWall.Models.OpenF1Api;
 using System.Diagnostics;
 
 namespace PitWall.Services;
@@ -14,7 +15,7 @@ public class OpenF1Client
 
     public async Task Test()
     {
-        IReadOnlyList<Driver> allDrivers = await GetDriversAsync();
+        IReadOnlyList<OpenF1Driver> allDrivers = await GetDriversAsync();
 
         Debug.WriteLine(string.Join("\n", allDrivers.Select(driver => driver)));
 
@@ -50,7 +51,7 @@ public class OpenF1Client
         return sessionKey ?? (meetingKey.HasValue ? null : SessionKey.Latest);
     }
 
-    public Task<IReadOnlyList<CarTelemetrySample>> GetCarTelemetryAsync(
+    public Task<IReadOnlyList<OpenF1CarTelemetrySample>> GetCarTelemetryAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         params Filter[] extraFilters)
@@ -58,13 +59,13 @@ public class OpenF1Client
         return GetCarTelemetryAsync(CancellationToken.None, sessionKey, driverNumber, extraFilters);
     }
 
-    public async Task<IReadOnlyList<CarTelemetrySample>> GetCarTelemetryAsync(
+    public async Task<IReadOnlyList<OpenF1CarTelemetrySample>> GetCarTelemetryAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<CarTelemetrySample>(
+        return await FetchEndpointAsync<OpenF1CarTelemetrySample>(
            endPoint: OpenF1APIEndpoint.CarData,
            sessionKey: sessionKey ?? SessionKey.Latest,
            driverNumber: driverNumber,
@@ -72,7 +73,7 @@ public class OpenF1Client
            extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<Driver>> GetDriversAsync(
+    public Task<IReadOnlyList<OpenF1Driver>> GetDriversAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -81,14 +82,14 @@ public class OpenF1Client
         return GetDriversAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<Driver>> GetDriversAsync(
+    public async Task<IReadOnlyList<OpenF1Driver>> GetDriversAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<Driver>(
+        return await FetchEndpointAsync<OpenF1Driver>(
             endPoint: OpenF1APIEndpoint.Drivers,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -97,7 +98,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<IntervalSample>> GetIntervalsAsync(
+    public Task<IReadOnlyList<OpenF1IntervalSample>> GetIntervalsAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -106,14 +107,14 @@ public class OpenF1Client
         return GetIntervalsAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<IntervalSample>> GetIntervalsAsync(
+    public async Task<IReadOnlyList<OpenF1IntervalSample>> GetIntervalsAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<IntervalSample>(
+        return await FetchEndpointAsync<OpenF1IntervalSample>(
             endPoint: OpenF1APIEndpoint.Intervals,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -122,7 +123,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<Lap>> GetLapsAsync(
+    public Task<IReadOnlyList<OpenF1Lap>> GetLapsAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -131,14 +132,14 @@ public class OpenF1Client
         return GetLapsAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<Lap>> GetLapsAsync(
+    public async Task<IReadOnlyList<OpenF1Lap>> GetLapsAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<Lap>(
+        return await FetchEndpointAsync<OpenF1Lap>(
             endPoint: OpenF1APIEndpoint.Laps,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -147,7 +148,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<Location>> GetLocationsAsync(
+    public Task<IReadOnlyList<OpenF1Location>> GetLocationsAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -156,14 +157,14 @@ public class OpenF1Client
         return GetLocationsAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<Location>> GetLocationsAsync(
+    public async Task<IReadOnlyList<OpenF1Location>> GetLocationsAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<Location>(
+        return await FetchEndpointAsync<OpenF1Location>(
             endPoint: OpenF1APIEndpoint.Location,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -198,7 +199,7 @@ public class OpenF1Client
             extraFilters: [.. filters]);
     }
 
-    public Task<IReadOnlyList<Overtake>> GetOvertakesAsync(
+    public Task<IReadOnlyList<OpenF1Overtake>> GetOvertakesAsync(
         SessionKey? sessionKey = null,
         MeetingKey? meetingKey = null,
         DriverNumber? overtakingDriverNumber = null,
@@ -214,7 +215,7 @@ public class OpenF1Client
             extraFilters);
     }
 
-    public async Task<IReadOnlyList<Overtake>> GetOvertakesAsync(
+    public async Task<IReadOnlyList<OpenF1Overtake>> GetOvertakesAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         MeetingKey? meetingKey = null,
@@ -230,7 +231,7 @@ public class OpenF1Client
         if (overtakenDriverNumber.HasValue)
             filters.Add(Filter.Equal(OvertakeFields.OvertakenDriverNumber, overtakenDriverNumber.Value));
 
-        return await FetchEndpointAsync<Overtake>(
+        return await FetchEndpointAsync<OpenF1Overtake>(
             endPoint: OpenF1APIEndpoint.Overtakes,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -238,7 +239,7 @@ public class OpenF1Client
             extraFilters: [.. filters]);
     }
 
-    public Task<IReadOnlyList<PitInfo>> GetPitAsync(
+    public Task<IReadOnlyList<OpenF1PitInfo>> GetPitAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -247,14 +248,14 @@ public class OpenF1Client
         return GetPitAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<PitInfo>> GetPitAsync(
+    public async Task<IReadOnlyList<OpenF1PitInfo>> GetPitAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<PitInfo>(
+        return await FetchEndpointAsync<OpenF1PitInfo>(
             endPoint: OpenF1APIEndpoint.Pit,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -263,7 +264,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<PositionUpdate>> GetPositionsAsync(
+    public Task<IReadOnlyList<OpenF1PositionUpdate>> GetPositionsAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -272,14 +273,14 @@ public class OpenF1Client
         return GetPositionsAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<PositionUpdate>> GetPositionsAsync(
+    public async Task<IReadOnlyList<OpenF1PositionUpdate>> GetPositionsAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<PositionUpdate>(
+        return await FetchEndpointAsync<OpenF1PositionUpdate>(
             endPoint: OpenF1APIEndpoint.Position,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -288,7 +289,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<RaceControlMessage>> GetRaceControlAsync(
+    public Task<IReadOnlyList<OpenF1RaceControlMessage>> GetRaceControlAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -297,14 +298,14 @@ public class OpenF1Client
         return GetRaceControlAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<RaceControlMessage>> GetRaceControlAsync(
+    public async Task<IReadOnlyList<OpenF1RaceControlMessage>> GetRaceControlAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<RaceControlMessage>(
+        return await FetchEndpointAsync<OpenF1RaceControlMessage>(
             endPoint: OpenF1APIEndpoint.RaceControl,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -342,7 +343,7 @@ public class OpenF1Client
             extraFilters: [.. filters]);
     }
 
-    public Task<IReadOnlyList<RaceResult>> GetRaceResultsAsync(
+    public Task<IReadOnlyList<OpenF1RaceResult>> GetRaceResultsAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -351,14 +352,14 @@ public class OpenF1Client
         return GetRaceResultsAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<RaceResult>> GetRaceResultsAsync(
+    public async Task<IReadOnlyList<OpenF1RaceResult>> GetRaceResultsAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<RaceResult>(
+        return await FetchEndpointAsync<OpenF1RaceResult>(
             endPoint: OpenF1APIEndpoint.SessionResult,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -367,7 +368,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<QualifyingResult>> GetQualifyingResultsAsync(
+    public Task<IReadOnlyList<OpenF1QualifyingResult>> GetQualifyingResultsAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -376,14 +377,14 @@ public class OpenF1Client
         return GetQualifyingResultsAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<QualifyingResult>> GetQualifyingResultsAsync(
+    public async Task<IReadOnlyList<OpenF1QualifyingResult>> GetQualifyingResultsAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<QualifyingResult>(
+        return await FetchEndpointAsync<OpenF1QualifyingResult>(
             endPoint: OpenF1APIEndpoint.SessionResult,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -417,7 +418,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<Stint>> GetStintsAsync(
+    public Task<IReadOnlyList<OpenF1Stint>> GetStintsAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -426,14 +427,14 @@ public class OpenF1Client
         return GetStintsAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<Stint>> GetStintsAsync(
+    public async Task<IReadOnlyList<OpenF1Stint>> GetStintsAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<Stint>(
+        return await FetchEndpointAsync<OpenF1Stint>(
             endPoint: OpenF1APIEndpoint.Stints,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -442,7 +443,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<TeamRadio>> GetTeamRadioAsync(
+    public Task<IReadOnlyList<OpenF1TeamRadio>> GetTeamRadioAsync(
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
@@ -451,14 +452,14 @@ public class OpenF1Client
         return GetTeamRadioAsync(CancellationToken.None, sessionKey, driverNumber, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<TeamRadio>> GetTeamRadioAsync(
+    public async Task<IReadOnlyList<OpenF1TeamRadio>> GetTeamRadioAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         DriverNumber? driverNumber = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<TeamRadio>(
+        return await FetchEndpointAsync<OpenF1TeamRadio>(
             endPoint: OpenF1APIEndpoint.TeamRadio,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,
@@ -467,7 +468,7 @@ public class OpenF1Client
             extraFilters: extraFilters);
     }
 
-    public Task<IReadOnlyList<Weather>> GetWeatherAsync(
+    public Task<IReadOnlyList<OpenF1Weather>> GetWeatherAsync(
         SessionKey? sessionKey = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
@@ -475,13 +476,13 @@ public class OpenF1Client
         return GetWeatherAsync(CancellationToken.None, sessionKey, meetingKey, extraFilters);
     }
 
-    public async Task<IReadOnlyList<Weather>> GetWeatherAsync(
+    public async Task<IReadOnlyList<OpenF1Weather>> GetWeatherAsync(
         CancellationToken cancellationToken,
         SessionKey? sessionKey = null,
         MeetingKey? meetingKey = null,
         params Filter[] extraFilters)
     {
-        return await FetchEndpointAsync<Weather>(
+        return await FetchEndpointAsync<OpenF1Weather>(
             endPoint: OpenF1APIEndpoint.Weather,
             sessionKey: DefaultLatestSession(sessionKey, meetingKey),
             meetingKey: meetingKey,

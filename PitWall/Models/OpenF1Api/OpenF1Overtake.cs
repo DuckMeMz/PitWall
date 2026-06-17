@@ -1,7 +1,8 @@
-﻿namespace PitWall.Models;
+﻿namespace PitWall.Models.OpenF1Api;
 
-public class Overtake
+public class OpenF1Overtake
 {
+    [System.Text.Json.Serialization.JsonPropertyName("date")]
     public DateTimeOffset? Timestamp { get; init; }
     public MeetingKey MeetingKey { get; init; }
     public SessionKey SessionKey { get; init; }

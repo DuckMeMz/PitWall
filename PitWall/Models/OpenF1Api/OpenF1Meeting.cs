@@ -11,7 +11,9 @@ public record OpenF1Meeting
     public string? CountryCode { get; init; }
     public string? CountryName { get; init; }
     public string? CircuitShortName { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("date_start")]
     public DateTimeOffset? TimestampStart { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("date_end")]
     public DateTimeOffset? TimestampEnd { get; init; }
     public string? GmtOffset { get; init; }
 

@@ -170,10 +170,21 @@ public class ApiEnumJsonConverter<TEnum> : JsonConverter<TEnum>
         if (reader.TokenType == JsonTokenType.Number)
         {
             long rawValue = reader.GetInt64();
+            Type underlyingType = Enum.GetUnderlyingType(typeof(TEnum));
+            object typedValue;
 
-            if (Enum.IsDefined(typeof(TEnum), rawValue))
+            try
             {
-                return (TEnum)Enum.ToObject(typeof(TEnum), rawValue);
+                typedValue = Convert.ChangeType(rawValue, underlyingType, CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex) when (ex is OverflowException or InvalidCastException)
+            {
+                return GetUnknownOrDefault();
+            }
+
+            if (Enum.IsDefined(typeof(TEnum), typedValue))
+            {
+                return (TEnum)Enum.ToObject(typeof(TEnum), typedValue);
             }
 
             return GetUnknownOrDefault();

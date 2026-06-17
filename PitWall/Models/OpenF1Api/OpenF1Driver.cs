@@ -1,6 +1,6 @@
-﻿namespace PitWall.Models;
+﻿namespace PitWall.Models.OpenF1Api;
 
-public record Driver
+public record OpenF1Driver
 {
     public string? BroadcastName { get; init; }
     public DriverNumber DriverNumber { get; init; }

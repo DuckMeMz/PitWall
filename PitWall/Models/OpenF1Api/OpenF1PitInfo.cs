@@ -1,7 +1,8 @@
 ﻿namespace PitWall.Models;
 
-public record PitInfo
+public record OpenF1PitInfo
 {
+    [System.Text.Json.Serialization.JsonPropertyName("date")]
     public DateTimeOffset? Timestamp { get; init; }
     public MeetingKey MeetingKey { get; init; }
     public SessionKey SessionKey { get; init; }

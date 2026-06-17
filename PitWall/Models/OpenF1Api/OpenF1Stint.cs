@@ -1,5 +1,5 @@
 ﻿namespace PitWall.Models;
-public record Stint
+public record OpenF1Stint
 {
     public MeetingKey MeetingKey { get; init; }
     public SessionKey SessionKey { get; init; }

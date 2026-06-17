@@ -1,8 +1,8 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace PitWall.Models;
+namespace PitWall.Models.OpenF1Api;
 
-public record CarTelemetrySample
+public record OpenF1CarTelemetrySample
 {
     [property: JsonPropertyName("date")]
     public DateTimeOffset? Timestamp { get; init; }

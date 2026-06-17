@@ -1,8 +1,12 @@
-﻿namespace PitWall.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace PitWall.Models;
 
 public record OpenF1Session
 {
+    [JsonPropertyName("date_start")]
     public DateTimeOffset? TimestampStart { get; init; }
+    [JsonPropertyName("date_end")]
     public DateTimeOffset? TimestampEnd { get; init; }
     public string? GmtOffset { get; init; }
     public MeetingKey MeetingKey { get; init; }
