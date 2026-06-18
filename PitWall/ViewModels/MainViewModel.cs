@@ -16,11 +16,12 @@ namespace PitWall.ViewModels;
 public class MainViewModel : INotifyPropertyChanged
 {
     private readonly SessionDataService _sessionDataService;
-    private readonly ReplayFrameBuilder _replayFrameBuilder;
+    private readonly ReplayBuilder _replayFrameBuilder;
     private readonly Stopwatch _playbackClock = new();
     private static readonly TimeSpan ReplayFrameStep = TimeSpan.FromMilliseconds(250);
-    private IReadOnlyList<ReplayFrame> _frames = [];
-    private IReadOnlyDictionary<DriverNumber, OpenF1Driver> _driversByNumber = new Dictionary<DriverNumber, OpenF1Driver>();
+    private ReplayTimeline? _replayTimeline;
+    private IReadOnlyDictionary<DriverNumber, IReadOnlyList<OpenF1IntervalSample>> _intervalsByDriver =
+        new Dictionary<DriverNumber, IReadOnlyList<OpenF1IntervalSample>>();
     private readonly Dictionary<DriverNumber, ReplayDriverRow> _driverRowsByNumber = new();
     private int _currentFrameIndex = -1;
     private TimeSpan _playbackStartTime;
@@ -32,14 +33,13 @@ public class MainViewModel : INotifyPropertyChanged
     private bool _isPlaying;
     private bool _isLoading;
     private bool _isPlaybackRendering;
-    private ReplayFrame? _currentFrame;
 
     public MainViewModel()
-        : this(CreateDefaultSessionDataService(), new ReplayFrameBuilder())
+        : this(CreateDefaultSessionDataService(), new ReplayBuilder())
     {
     }
 
-    public MainViewModel(SessionDataService sessionDataService, ReplayFrameBuilder replayFrameBuilder)
+    public MainViewModel(SessionDataService sessionDataService, ReplayBuilder replayFrameBuilder)
     {
         _sessionDataService = sessionDataService;
         _replayFrameBuilder = replayFrameBuilder;
@@ -130,16 +130,12 @@ public class MainViewModel : INotifyPropertyChanged
 
     public string PlayPauseText => IsPlaying ? "Pause" : "Play";
 
-    public ReplayFrame? CurrentFrame
-    {
-        get => _currentFrame;
-        private set => SetProperty(ref _currentFrame, value);
-    }
-
     public string FrameText =>
-        _frames.Count == 0 || _currentFrameIndex < 0
+        _replayTimeline is null || _replayTimeline.UniqueFrameCount == 0 || _currentFrameIndex < 0
             ? "Frame 0 / 0"
-            : $"Playhead {CurrentTimeSeconds:0.000}s | Keyframe {_currentFrameIndex + 1:N0} / {_frames.Count:N0}";
+            : $"Playhead {CurrentTimeSeconds:0.000}s | Keyframe {_currentFrameIndex + 1:N0} / {_replayTimeline.UniqueFrameCount:N0}";
+
+    private bool HasReplay => _replayTimeline is { UniqueFrameCount: > 0 };
 
     private async Task LoadReplayAsync()
     {
@@ -163,20 +159,38 @@ public class MainViewModel : INotifyPropertyChanged
             StatusText = "Building replay frames...";
 
             Stopwatch buildTimer = Stopwatch.StartNew();
-            IReadOnlyList<ReplayFrame> frames = _replayFrameBuilder.BuildFrames(replayData, ReplayFrameStep);
+            ReplayTimeline timeline = _replayFrameBuilder.BuildReplay(replayData, ReplayFrameStep);
             buildTimer.Stop();
             loadTimer.Stop();
 
-            LoadFrames(replayData, frames);
+            LoadTimeline(replayData, timeline);
+
+            static double ToMb(long bytes) => bytes / 1024.0 / 1024.0;
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            long managedBytes = GC.GetTotalMemory(forceFullCollection: true);
+
+            using Process process = Process.GetCurrentProcess();
+            process.Refresh();
+
+            double managedMb = ToMb(managedBytes);
+            double workingSetMb = ToMb(process.WorkingSet64);
+            double privateMb = ToMb(process.PrivateMemorySize64);
 
             StatusText =
-                $"Loaded {frames.Count:N0} frames in {loadTimer.Elapsed.TotalSeconds:0.0}s " +
+                $"Loaded {timeline.UniqueFrameCount:N0} frames in {loadTimer.Elapsed.TotalSeconds:0.0}s " +
                 $"(frame build {buildTimer.ElapsedMilliseconds:N0}ms at {ReplayFrameStep.TotalMilliseconds:0}ms/frame). " +
                 $"Streams: {replayData.Locations.Count:N0} locations, " +
                 $"{replayData.Positions.Count:N0} positions, " +
                 $"{replayData.CarTelementry.Count:N0} telemetry, " +
                 $"{replayData.Intervals.Count:N0} intervals, " +
-                $"{replayData.Laps.Count:N0} laps.";
+                $"{replayData.Laps.Count:N0} laps. " +
+                $"Managed heap: {managedMb:0.0} MB, " +
+                $"Working set: {workingSetMb:0.0} MB, " +
+                $"Private memory: {privateMb:0.0} MB";
         }
         catch (Exception ex)
         {
@@ -188,22 +202,30 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    private void LoadFrames(ReplayData replayData, IReadOnlyList<ReplayFrame> frames)
+    private void LoadTimeline(ReplayData replayData, ReplayTimeline timeline)
     {
-        _frames = frames;
-        _driversByNumber = replayData.Drivers.ToDictionary(driver => driver.DriverNumber);
-        InitializeDriverRows(replayData.Drivers);
-        DurationSeconds = frames.Count == 0 ? 0 : frames[^1].SessionTime.TotalSeconds;
+        _replayTimeline = timeline;
+        _intervalsByDriver = replayData.Intervals
+            .Where(interval => interval.Timestamp is not null)
+            .GroupBy(interval => interval.DriverNumber)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<OpenF1IntervalSample>)group
+                    .OrderBy(interval => interval.Timestamp)
+                    .ToList());
 
-        if (frames.Count > 0)
+        InitializeDriverRows(replayData.Drivers);
+        DurationSeconds = timeline.Duration.TotalSeconds;
+
+        if (timeline.UniqueFrameCount > 0)
         {
-            ApplyFrame(0, frames[0].SessionTime);
+            ApplyFrame(0, TimeSpan.Zero);
         }
     }
 
     private void TogglePlayback()
     {
-        if (_frames.Count == 0 || IsLoading)
+        if (!HasReplay || IsLoading)
         {
             return;
         }
@@ -214,12 +236,14 @@ public class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (_currentFrameIndex >= _frames.Count - 1)
+        ReplayTimeline timeline = _replayTimeline!;
+
+        if (_currentFrameIndex >= timeline.UniqueFrameCount - 1)
         {
             SeekTo(TimeSpan.Zero, resetPlaybackClock: false);
         }
 
-        _playbackStartTime = CurrentFrame?.SessionTime ?? TimeSpan.Zero;
+        _playbackStartTime = TimeSpan.FromSeconds(CurrentTimeSeconds);
         _playbackClock.Restart();
         StartPlaybackRendering();
         IsPlaying = true;
@@ -277,124 +301,174 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void SeekTo(TimeSpan targetTime, bool resetPlaybackClock)
     {
-        if (_frames.Count == 0)
+        if (!HasReplay)
         {
             return;
         }
 
+        targetTime = ClampToReplayDuration(targetTime);
         int frameIndex = FindFrameIndexAtOrBefore(targetTime);
         ApplyFrame(frameIndex, targetTime);
 
         if (resetPlaybackClock && IsPlaying)
         {
-            _playbackStartTime = CurrentFrame?.SessionTime ?? TimeSpan.Zero;
+            _playbackStartTime = TimeSpan.FromSeconds(CurrentTimeSeconds);
             _playbackClock.Restart();
         }
     }
 
     private int FindFrameIndexAtOrBefore(TimeSpan targetTime)
     {
-        int low = 0;
-        int high = _frames.Count - 1;
-        int bestIndex = 0;
+        ReplayTimeline timeline = _replayTimeline
+            ?? throw new InvalidOperationException("Can't find a frame without a loaded replay timeline.");
 
-        while (low <= high)
+        if (targetTime >= timeline.Duration)
         {
-            int middle = low + (high - low) / 2;
-
-            if (_frames[middle].SessionTime <= targetTime)
-            {
-                bestIndex = middle;
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
+            return timeline.UniqueFrameCount - 1;
         }
 
-        return bestIndex;
+        long frameIndex = targetTime.Ticks / timeline.FrameStep.Ticks;
+        return (int)Math.Clamp(frameIndex, 0, timeline.UniqueFrameCount - 1);
+    }
+
+    private TimeSpan ClampToReplayDuration(TimeSpan targetTime)
+    {
+        ReplayTimeline timeline = _replayTimeline
+            ?? throw new InvalidOperationException("Can't clamp replay time without a loaded replay timeline.");
+
+        if (targetTime <= TimeSpan.Zero)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return targetTime >= timeline.Duration ? timeline.Duration : targetTime;
+    }
+
+    private static TimeSpan GetFrameTime(ReplayTimeline timeline, int frameIndex)
+    {
+        long requestedTicks = checked(frameIndex * timeline.FrameStep.Ticks);
+        long clampedTicks = Math.Min(requestedTicks, timeline.Duration.Ticks);
+
+        return TimeSpan.FromTicks(clampedTicks);
     }
 
     private void ApplyFrame(int frameIndex, TimeSpan targetTime)
     {
-        if (frameIndex < 0 || frameIndex >= _frames.Count)
+        ReplayTimeline? timeline = _replayTimeline;
+
+        if (timeline is null || frameIndex < 0 || frameIndex >= timeline.UniqueFrameCount)
         {
             return;
         }
 
-        ReplayFrame frame = BuildDisplayFrame(frameIndex, targetTime);
-
         _currentFrameIndex = frameIndex;
-        CurrentFrame = frame;
-        SetCurrentTimeSeconds(frame.SessionTime.TotalSeconds);
-        RefreshDriverStates(frame);
+        SetCurrentTimeSeconds(targetTime.TotalSeconds);
+        RefreshDriverStates(timeline, frameIndex, targetTime);
 
         OnPropertyChanged(nameof(FrameText));
     }
 
-    private ReplayFrame BuildDisplayFrame(int frameIndex, TimeSpan targetTime)
+    private void RefreshDriverStates(ReplayTimeline timeline, int frameIndex, TimeSpan targetTime)
     {
-        ReplayFrame currentFrame = _frames[frameIndex];
+        int nextFrameIndex = Math.Min(frameIndex + 1, timeline.UniqueFrameCount - 1);
+        TimeSpan currentFrameTime = GetFrameTime(timeline, frameIndex);
+        TimeSpan nextFrameTime = GetFrameTime(timeline, nextFrameIndex);
+        double amount = GetInterpolationAmount(targetTime, currentFrameTime, nextFrameTime);
+        DateTimeOffset timestamp = timeline.SessionStart + targetTime;
+        bool shouldSortRows = false;
 
-        if (frameIndex >= _frames.Count - 1)
+        ReadOnlySpan<DriverReplayState> currentStates = timeline.GetAllStatesForFrame(frameIndex);
+        ReadOnlySpan<DriverReplayState> nextStates = nextFrameIndex == frameIndex
+            ? ReadOnlySpan<DriverReplayState>.Empty
+            : timeline.GetAllStatesForFrame(nextFrameIndex);
+
+        for (int driverIndex = 0; driverIndex < currentStates.Length; driverIndex++)
         {
-            return currentFrame;
-        }
+            DriverReplayState currentState = currentStates[driverIndex];
+            DriverReplayState? nextState = nextStates.IsEmpty ? null : nextStates[driverIndex];
+            DriverReplayState displayState = InterpolateDriverState(currentState, nextState, timestamp, amount);
 
-        ReplayFrame nextFrame = _frames[frameIndex + 1];
-        double amount = GetInterpolationAmount(
-            targetTime,
-            currentFrame.SessionTime,
-            nextFrame.SessionTime);
-
-        if (amount <= 0)
-        {
-            return currentFrame;
-        }
-
-        if (amount >= 1)
-        {
-            return nextFrame;
-        }
-
-        DateTimeOffset timestamp = currentFrame.Timestamp +
-            TimeSpan.FromTicks((long)((nextFrame.Timestamp - currentFrame.Timestamp).Ticks * amount));
-
-        Dictionary<DriverNumber, DriverReplayState> driverStates = new(currentFrame.Drivers.Count);
-
-        foreach (KeyValuePair<DriverNumber, DriverReplayState> currentDriver in currentFrame.Drivers)
-        {
-            nextFrame.Drivers.TryGetValue(currentDriver.Key, out DriverReplayState? nextState);
-            driverStates[currentDriver.Key] = InterpolateDriverState(currentDriver.Value, nextState, timestamp, amount);
-        }
-
-        foreach (KeyValuePair<DriverNumber, DriverReplayState> nextDriver in nextFrame.Drivers)
-        {
-            if (!driverStates.ContainsKey(nextDriver.Key))
+            if (_driverRowsByNumber.TryGetValue(displayState.DriverNumber, out ReplayDriverRow? row))
             {
-                driverStates[nextDriver.Key] = nextDriver.Value;
+                shouldSortRows |= row.Update(displayState);
             }
         }
 
-        return new ReplayFrame(timestamp, targetTime, driverStates);
+        if (shouldSortRows)
+        {
+            SortDriverRowsByPosition();
+        }
     }
 
-    private static DriverReplayState InterpolateDriverState(
+    private DriverReplayState InterpolateDriverState(
         DriverReplayState previous,
         DriverReplayState? next,
         DateTimeOffset timestamp,
         double amount)
     {
+        OpenF1IntervalSample? interval =
+            InterpolateRawInterval(previous.DriverNumber, timestamp)
+            ?? InterpolateInterval(previous.Interval, next?.Interval, timestamp, amount);
+
         return previous with
         {
             Location = InterpolateLocation(previous.Location, next?.Location, timestamp, amount),
             Telemetry = InterpolateTelemetry(previous.Telemetry, next?.Telemetry, timestamp, amount),
-            Interval = InterpolateInterval(previous.Interval, next?.Interval, timestamp, amount),
+            Interval = interval,
             CurrentLap = previous.CurrentLap ?? next?.CurrentLap,
             CurrentStint = previous.CurrentStint ?? next?.CurrentStint,
             CurrentPitStop = previous.CurrentPitStop ?? next?.CurrentPitStop
         };
+    }
+
+    private OpenF1IntervalSample? InterpolateRawInterval(DriverNumber driverNumber, DateTimeOffset timestamp)
+    {
+        if (!_intervalsByDriver.TryGetValue(driverNumber, out IReadOnlyList<OpenF1IntervalSample>? intervals)
+            || intervals.Count == 0)
+        {
+            return null;
+        }
+
+        int nextIndex = FindFirstIntervalAfter(intervals, timestamp);
+        OpenF1IntervalSample? previous = nextIndex > 0 ? intervals[nextIndex - 1] : null;
+        OpenF1IntervalSample? next = nextIndex < intervals.Count ? intervals[nextIndex] : null;
+
+        if (previous is null)
+        {
+            return null;
+        }
+
+        double amount = GetInterpolationAmount(timestamp, previous.Timestamp, next?.Timestamp);
+
+        return previous with
+        {
+            Timestamp = timestamp,
+            GapToLeader = InterpolateTimingGap(previous.GapToLeader, next?.GapToLeader, amount),
+            IntervalToAhead = InterpolateTimingGap(previous.IntervalToAhead, next?.IntervalToAhead, amount)
+        };
+    }
+
+    private static int FindFirstIntervalAfter(IReadOnlyList<OpenF1IntervalSample> intervals, DateTimeOffset timestamp)
+    {
+        int low = 0;
+        int high = intervals.Count;
+
+        while (low < high)
+        {
+            int middle = low + (high - low) / 2;
+            DateTimeOffset? sampleTimestamp = intervals[middle].Timestamp;
+
+            if (sampleTimestamp is not null && sampleTimestamp.Value <= timestamp)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low;
     }
 
     private static OpenF1Location? InterpolateLocation(OpenF1Location? previous, OpenF1Location? next, DateTimeOffset timestamp, double amount)
@@ -475,6 +549,28 @@ public class MainViewModel : INotifyPropertyChanged
         return Math.Clamp(amount, 0, 1);
     }
 
+    private static double GetInterpolationAmount(
+        DateTimeOffset timestamp,
+        DateTimeOffset? previousTimestamp,
+        DateTimeOffset? nextTimestamp)
+    {
+        if (previousTimestamp is null || nextTimestamp is null)
+        {
+            return 0;
+        }
+
+        TimeSpan window = nextTimestamp.Value - previousTimestamp.Value;
+
+        if (window <= TimeSpan.Zero)
+        {
+            return 0;
+        }
+
+        double amount = (timestamp - previousTimestamp.Value).TotalMilliseconds / window.TotalMilliseconds;
+
+        return Math.Clamp(amount, 0, 1);
+    }
+
     private static int? InterpolateInt(int? previous, int? next, double amount)
     {
         if (previous.HasValue && next.HasValue)
@@ -494,24 +590,6 @@ public class MainViewModel : INotifyPropertyChanged
         }
 
         return previous ?? next;
-    }
-
-    private void RefreshDriverStates(ReplayFrame frame)
-    {
-        bool shouldSortRows = false;
-
-        foreach (DriverReplayState state in frame.Drivers.Values)
-        {
-            if (_driverRowsByNumber.TryGetValue(state.DriverNumber, out ReplayDriverRow? row))
-            {
-                shouldSortRows |= row.Update(state);
-            }
-        }
-
-        if (shouldSortRows)
-        {
-            SortDriverRowsByPosition();
-        }
     }
 
     private void SortDriverRowsByPosition()
@@ -549,10 +627,9 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void ClearReplay()
     {
-        _frames = [];
-        _driversByNumber = new Dictionary<DriverNumber, OpenF1Driver>();
+        _replayTimeline = null;
+        _intervalsByDriver = new Dictionary<DriverNumber, IReadOnlyList<OpenF1IntervalSample>>();
         _currentFrameIndex = -1;
-        CurrentFrame = null;
         DurationSeconds = 0;
         SetCurrentTimeSeconds(0);
         DriverStates.Clear();

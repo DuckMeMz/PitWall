@@ -26,28 +26,5 @@ namespace PitWall
 
             DataContext = new MainViewModel();
         }
-
-        public async Task Testy()
-        {
-            HttpClient httpClient = new HttpClient();
-            OpenF1APIService apiService = new OpenF1APIService(httpClient);
-            OpenF1Client client = new OpenF1Client(apiService);
-            SessionCatalogService sessionCatalog = new SessionCatalogService(client);
-            SessionDataService sessionData = new SessionDataService(client, sessionCatalog);
-            ReplayFrameBuilder replayFrameBuilder = new ReplayFrameBuilder();
-
-            CalendarMeeting silverstoneMeeting = await sessionCatalog.GetCalendarMeetingAsync(2025, "silverstone");
-            OpenF1Session? silverstoneRace = silverstoneMeeting.GetMainRaceSession();
-            if(silverstoneRace is not null)
-            {
-                ReplayData silverstoneReplayData = await sessionData.LoadReplayDataAsync(
-                    silverstoneRace.SessionKey
-                );
-
-                IReadOnlyList<ReplayFrame> replayFrames = replayFrameBuilder.BuildFrames(silverstoneReplayData);
-            } 
-        }
     }
-
-    
 }
