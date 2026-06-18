@@ -2,55 +2,101 @@
 
 namespace PitWall.Models;
 
-public record ReplayTimeline(
-    DateTimeOffset SessionStart,
-    TimeSpan Duration,
-    TimeSpan FrameStep,
-    OpenF1Driver[] Drivers,
-    DriverReplayState[] DriverStatesByFrame)
+public record ReplayTimeline
 {
+    public DateTimeOffset SessionStart { get; init; }
+    public TimeSpan Duration { get; init; }
+    public OpenF1Driver[] Drivers { get; init; }
+    public DriverReplayStream[] DriverStreams { get; init; }
     public int DriverCount => Drivers.Length;
-    public int UniqueFrameCount => DriverCount == 0 ? 0 : DriverStatesByFrame.Length / DriverCount;
 
-    public int GetFrameStartIndex(int frameIndex)
+    public ReplayTimeline(
+        DateTimeOffset sessionStart,
+        TimeSpan duration,
+        OpenF1Driver[] drivers,
+        DriverReplayStream[] driverStreams)
     {
-        return frameIndex * DriverCount;
+        if (drivers.Length != driverStreams.Length)
+        {
+            throw new ArgumentException(
+                $"Replay timeline must have the same number of drivers and driver streams. " +
+                $"Drivers: {drivers.Length}, streams: {driverStreams.Length}.");
+        }
+
+        SessionStart = sessionStart;
+        Duration = duration;
+        Drivers = drivers;
+        DriverStreams = driverStreams;
     }
 
-    public DriverReplayState GetSingleStateForFrame(int frameIndex, int driverIndex)
+  
+    public DriverReplayState GetStateAt(int driverIndex, TimeSpan sessionTime)
     {
-        if(frameIndex < 0 || driverIndex < 0)
+        ValidateDriverIndex(driverIndex);
+
+        DateTimeOffset timestamp = SessionStart + ClampSessionTime(sessionTime);
+
+        return DriverStreams[driverIndex].GetStateAt(timestamp);
+    }
+
+    public DriverReplayState GetStateAt(int driverIndex, DateTimeOffset timestamp)
+    {
+        ValidateDriverIndex(driverIndex);
+
+        DateTimeOffset clampedTimestamp = ClampSessionTimestamp(timestamp);
+
+        return DriverStreams[driverIndex].GetStateAt(clampedTimestamp);
+    }
+    public DriverReplayStream GetDriverStream(int driverIndex)
+    {
+        ValidateDriverIndex(driverIndex);
+        return DriverStreams[driverIndex];
+    }
+
+    private void ValidateDriverIndex(int driverIndex)
+    {
+        if(driverIndex < 0)
         {
-            throw new InvalidOperationException("Frame or driver index can't be < 0.");
+            throw new ArgumentOutOfRangeException(
+                nameof(driverIndex), "Driver index can't be less than 0.");
         }
 
         if(driverIndex >= DriverCount)
         {
-            throw new InvalidOperationException($"Driver index: {driverIndex} can't be greater than or equal to the amount of drivers: {DriverCount}.");
+            throw new ArgumentOutOfRangeException(
+            nameof(driverIndex), $"Driver index {driverIndex} can't be greater than or equal to driver count {DriverCount}.");
         }
-
-        if(frameIndex >= UniqueFrameCount)
-        {
-            throw new InvalidOperationException($"Frame index {frameIndex} can't be greater than or equal to the amount of unique frames {UniqueFrameCount}.");
-        }
-
-        int index = GetFrameStartIndex(frameIndex) + driverIndex;
-        return DriverStatesByFrame[index];
     }
 
-    public ReadOnlySpan<DriverReplayState> GetAllStatesForFrame(int frameIndex)
+    private TimeSpan ClampSessionTime(TimeSpan sessionTime)
     {
-        if (frameIndex < 0)
+        if (sessionTime <= TimeSpan.Zero)
         {
-            throw new InvalidOperationException("Frame index can't be < 0.");
+            return TimeSpan.Zero;
         }
 
-        if (frameIndex >= UniqueFrameCount)
+        if(sessionTime >= Duration)
         {
-            throw new InvalidOperationException($"Frame index {frameIndex} can't be greater than or equal to the amount of unique frames {UniqueFrameCount}.");
+            return Duration;
         }
 
-        int startIndex = GetFrameStartIndex(frameIndex);
-        return DriverStatesByFrame.AsSpan(startIndex, DriverCount);
+        return sessionTime;
+    }
+
+    private DateTimeOffset ClampSessionTimestamp(DateTimeOffset timestamp)
+    {
+        DateTimeOffset sessionEnd = SessionStart + Duration;
+
+        if(timestamp <= SessionStart)
+        {
+            return SessionStart;
+        }
+
+        if(timestamp >= sessionEnd)
+        {
+            return sessionEnd;
+        }
+
+        return timestamp;
     }
 }

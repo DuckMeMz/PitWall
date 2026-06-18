@@ -18,12 +18,8 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly SessionDataService _sessionDataService;
     private readonly ReplayBuilder _replayFrameBuilder;
     private readonly Stopwatch _playbackClock = new();
-    private static readonly TimeSpan ReplayFrameStep = TimeSpan.FromMilliseconds(250);
     private ReplayTimeline? _replayTimeline;
-    private IReadOnlyDictionary<DriverNumber, IReadOnlyList<OpenF1IntervalSample>> _intervalsByDriver =
-        new Dictionary<DriverNumber, IReadOnlyList<OpenF1IntervalSample>>();
     private readonly Dictionary<DriverNumber, ReplayDriverRow> _driverRowsByNumber = new();
-    private int _currentFrameIndex = -1;
     private TimeSpan _playbackStartTime;
     private string _sessionKeyText = "latest";
     private string _statusText = "Enter a session key and load replay data.";
@@ -131,11 +127,11 @@ public class MainViewModel : INotifyPropertyChanged
     public string PlayPauseText => IsPlaying ? "Pause" : "Play";
 
     public string FrameText =>
-        _replayTimeline is null || _replayTimeline.UniqueFrameCount == 0 || _currentFrameIndex < 0
-            ? "Frame 0 / 0"
-            : $"Playhead {CurrentTimeSeconds:0.000}s | Keyframe {_currentFrameIndex + 1:N0} / {_replayTimeline.UniqueFrameCount:N0}";
+        _replayTimeline is null
+            ? "Playhead 0.000s | Drivers 0"
+            : $"Playhead {CurrentTimeSeconds:0.000}s | Drivers {_replayTimeline.DriverCount:N0}";
 
-    private bool HasReplay => _replayTimeline is { UniqueFrameCount: > 0 };
+    private bool HasReplay => _replayTimeline is { DriverCount: > 0 };
 
     private async Task LoadReplayAsync()
     {
@@ -156,10 +152,10 @@ public class MainViewModel : INotifyPropertyChanged
             Stopwatch loadTimer = Stopwatch.StartNew();
             ReplayData replayData = await _sessionDataService.LoadReplayDataAsync(sessionKey);
 
-            StatusText = "Building replay frames...";
+            StatusText = "Building replay timeline...";
 
             Stopwatch buildTimer = Stopwatch.StartNew();
-            ReplayTimeline timeline = _replayFrameBuilder.BuildReplay(replayData, ReplayFrameStep);
+            ReplayTimeline timeline = _replayFrameBuilder.BuildReplay(replayData);
             buildTimer.Stop();
             loadTimer.Stop();
 
@@ -181,8 +177,8 @@ public class MainViewModel : INotifyPropertyChanged
             double privateMb = ToMb(process.PrivateMemorySize64);
 
             StatusText =
-                $"Loaded {timeline.UniqueFrameCount:N0} frames in {loadTimer.Elapsed.TotalSeconds:0.0}s " +
-                $"(frame build {buildTimer.ElapsedMilliseconds:N0}ms at {ReplayFrameStep.TotalMilliseconds:0}ms/frame). " +
+                $"Loaded {timeline.DriverCount:N0} driver streams in {loadTimer.Elapsed.TotalSeconds:0.0}s " +
+                $"(timeline build {buildTimer.ElapsedMilliseconds:N0}ms). " +
                 $"Streams: {replayData.Locations.Count:N0} locations, " +
                 $"{replayData.Positions.Count:N0} positions, " +
                 $"{replayData.CarTelementry.Count:N0} telemetry, " +
@@ -205,21 +201,12 @@ public class MainViewModel : INotifyPropertyChanged
     private void LoadTimeline(ReplayData replayData, ReplayTimeline timeline)
     {
         _replayTimeline = timeline;
-        _intervalsByDriver = replayData.Intervals
-            .Where(interval => interval.Timestamp is not null)
-            .GroupBy(interval => interval.DriverNumber)
-            .ToDictionary(
-                group => group.Key,
-                group => (IReadOnlyList<OpenF1IntervalSample>)group
-                    .OrderBy(interval => interval.Timestamp)
-                    .ToList());
-
         InitializeDriverRows(replayData.Drivers);
         DurationSeconds = timeline.Duration.TotalSeconds;
 
-        if (timeline.UniqueFrameCount > 0)
+        if (timeline.DriverCount > 0)
         {
-            ApplyFrame(0, TimeSpan.Zero);
+            ApplyPlayhead(TimeSpan.Zero);
         }
     }
 
@@ -236,9 +223,7 @@ public class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        ReplayTimeline timeline = _replayTimeline!;
-
-        if (_currentFrameIndex >= timeline.UniqueFrameCount - 1)
+        if (CurrentTimeSeconds >= DurationSeconds)
         {
             SeekTo(TimeSpan.Zero, resetPlaybackClock: false);
         }
@@ -307,28 +292,13 @@ public class MainViewModel : INotifyPropertyChanged
         }
 
         targetTime = ClampToReplayDuration(targetTime);
-        int frameIndex = FindFrameIndexAtOrBefore(targetTime);
-        ApplyFrame(frameIndex, targetTime);
+        ApplyPlayhead(targetTime);
 
         if (resetPlaybackClock && IsPlaying)
         {
             _playbackStartTime = TimeSpan.FromSeconds(CurrentTimeSeconds);
             _playbackClock.Restart();
         }
-    }
-
-    private int FindFrameIndexAtOrBefore(TimeSpan targetTime)
-    {
-        ReplayTimeline timeline = _replayTimeline
-            ?? throw new InvalidOperationException("Can't find a frame without a loaded replay timeline.");
-
-        if (targetTime >= timeline.Duration)
-        {
-            return timeline.UniqueFrameCount - 1;
-        }
-
-        long frameIndex = targetTime.Ticks / timeline.FrameStep.Ticks;
-        return (int)Math.Clamp(frameIndex, 0, timeline.UniqueFrameCount - 1);
     }
 
     private TimeSpan ClampToReplayDuration(TimeSpan targetTime)
@@ -344,49 +314,28 @@ public class MainViewModel : INotifyPropertyChanged
         return targetTime >= timeline.Duration ? timeline.Duration : targetTime;
     }
 
-    private static TimeSpan GetFrameTime(ReplayTimeline timeline, int frameIndex)
-    {
-        long requestedTicks = checked(frameIndex * timeline.FrameStep.Ticks);
-        long clampedTicks = Math.Min(requestedTicks, timeline.Duration.Ticks);
-
-        return TimeSpan.FromTicks(clampedTicks);
-    }
-
-    private void ApplyFrame(int frameIndex, TimeSpan targetTime)
+    private void ApplyPlayhead(TimeSpan targetTime)
     {
         ReplayTimeline? timeline = _replayTimeline;
 
-        if (timeline is null || frameIndex < 0 || frameIndex >= timeline.UniqueFrameCount)
+        if (timeline is null)
         {
             return;
         }
 
-        _currentFrameIndex = frameIndex;
         SetCurrentTimeSeconds(targetTime.TotalSeconds);
-        RefreshDriverStates(timeline, frameIndex, targetTime);
+        RefreshDriverStates(timeline, targetTime);
 
         OnPropertyChanged(nameof(FrameText));
     }
 
-    private void RefreshDriverStates(ReplayTimeline timeline, int frameIndex, TimeSpan targetTime)
+    private void RefreshDriverStates(ReplayTimeline timeline, TimeSpan targetTime)
     {
-        int nextFrameIndex = Math.Min(frameIndex + 1, timeline.UniqueFrameCount - 1);
-        TimeSpan currentFrameTime = GetFrameTime(timeline, frameIndex);
-        TimeSpan nextFrameTime = GetFrameTime(timeline, nextFrameIndex);
-        double amount = GetInterpolationAmount(targetTime, currentFrameTime, nextFrameTime);
-        DateTimeOffset timestamp = timeline.SessionStart + targetTime;
         bool shouldSortRows = false;
 
-        ReadOnlySpan<DriverReplayState> currentStates = timeline.GetAllStatesForFrame(frameIndex);
-        ReadOnlySpan<DriverReplayState> nextStates = nextFrameIndex == frameIndex
-            ? ReadOnlySpan<DriverReplayState>.Empty
-            : timeline.GetAllStatesForFrame(nextFrameIndex);
-
-        for (int driverIndex = 0; driverIndex < currentStates.Length; driverIndex++)
+        for (int driverIndex = 0; driverIndex < timeline.DriverCount; driverIndex++)
         {
-            DriverReplayState currentState = currentStates[driverIndex];
-            DriverReplayState? nextState = nextStates.IsEmpty ? null : nextStates[driverIndex];
-            DriverReplayState displayState = InterpolateDriverState(currentState, nextState, timestamp, amount);
+            DriverReplayState displayState = timeline.GetStateAt(driverIndex, targetTime);
 
             if (_driverRowsByNumber.TryGetValue(displayState.DriverNumber, out ReplayDriverRow? row))
             {
@@ -398,198 +347,6 @@ public class MainViewModel : INotifyPropertyChanged
         {
             SortDriverRowsByPosition();
         }
-    }
-
-    private DriverReplayState InterpolateDriverState(
-        DriverReplayState previous,
-        DriverReplayState? next,
-        DateTimeOffset timestamp,
-        double amount)
-    {
-        OpenF1IntervalSample? interval =
-            InterpolateRawInterval(previous.DriverNumber, timestamp)
-            ?? InterpolateInterval(previous.Interval, next?.Interval, timestamp, amount);
-
-        return previous with
-        {
-            Location = InterpolateLocation(previous.Location, next?.Location, timestamp, amount),
-            Telemetry = InterpolateTelemetry(previous.Telemetry, next?.Telemetry, timestamp, amount),
-            Interval = interval,
-            CurrentLap = previous.CurrentLap ?? next?.CurrentLap,
-            CurrentStint = previous.CurrentStint ?? next?.CurrentStint,
-            CurrentPitStop = previous.CurrentPitStop ?? next?.CurrentPitStop
-        };
-    }
-
-    private OpenF1IntervalSample? InterpolateRawInterval(DriverNumber driverNumber, DateTimeOffset timestamp)
-    {
-        if (!_intervalsByDriver.TryGetValue(driverNumber, out IReadOnlyList<OpenF1IntervalSample>? intervals)
-            || intervals.Count == 0)
-        {
-            return null;
-        }
-
-        int nextIndex = FindFirstIntervalAfter(intervals, timestamp);
-        OpenF1IntervalSample? previous = nextIndex > 0 ? intervals[nextIndex - 1] : null;
-        OpenF1IntervalSample? next = nextIndex < intervals.Count ? intervals[nextIndex] : null;
-
-        if (previous is null)
-        {
-            return null;
-        }
-
-        double amount = GetInterpolationAmount(timestamp, previous.Timestamp, next?.Timestamp);
-
-        return previous with
-        {
-            Timestamp = timestamp,
-            GapToLeader = InterpolateTimingGap(previous.GapToLeader, next?.GapToLeader, amount),
-            IntervalToAhead = InterpolateTimingGap(previous.IntervalToAhead, next?.IntervalToAhead, amount)
-        };
-    }
-
-    private static int FindFirstIntervalAfter(IReadOnlyList<OpenF1IntervalSample> intervals, DateTimeOffset timestamp)
-    {
-        int low = 0;
-        int high = intervals.Count;
-
-        while (low < high)
-        {
-            int middle = low + (high - low) / 2;
-            DateTimeOffset? sampleTimestamp = intervals[middle].Timestamp;
-
-            if (sampleTimestamp is not null && sampleTimestamp.Value <= timestamp)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle;
-            }
-        }
-
-        return low;
-    }
-
-    private static OpenF1Location? InterpolateLocation(OpenF1Location? previous, OpenF1Location? next, DateTimeOffset timestamp, double amount)
-    {
-        OpenF1Location? source = previous ?? next;
-
-        if (source is null)
-        {
-            return null;
-        }
-
-        return source with
-        {
-            TimestampStart = timestamp,
-            X = InterpolateInt(previous?.X, next?.X, amount),
-            Y = InterpolateInt(previous?.Y, next?.Y, amount),
-            Z = InterpolateInt(previous?.Z, next?.Z, amount)
-        };
-    }
-
-    private static OpenF1CarTelemetrySample? InterpolateTelemetry(
-        OpenF1CarTelemetrySample? previous,
-        OpenF1CarTelemetrySample? next,
-        DateTimeOffset timestamp,
-        double amount)
-    {
-        OpenF1CarTelemetrySample? source = previous ?? next;
-
-        if (source is null)
-        {
-            return null;
-        }
-
-        return source with
-        {
-            Timestamp = timestamp,
-            Throttle = InterpolateInt(previous?.Throttle, next?.Throttle, amount),
-            Brake = InterpolateInt(previous?.Brake, next?.Brake, amount),
-            Speed = InterpolateInt(previous?.Speed, next?.Speed, amount),
-            Rpm = InterpolateInt(previous?.Rpm, next?.Rpm, amount),
-            Gear = previous?.Gear ?? next?.Gear,
-            Drs = previous?.Drs ?? next?.Drs
-        };
-    }
-
-    private static OpenF1IntervalSample? InterpolateInterval(
-        OpenF1IntervalSample? previous,
-        OpenF1IntervalSample? next,
-        DateTimeOffset timestamp,
-        double amount)
-    {
-        OpenF1IntervalSample? source = previous ?? next;
-
-        if (source is null)
-        {
-            return null;
-        }
-
-        return source with
-        {
-            Timestamp = timestamp,
-            GapToLeader = InterpolateTimingGap(previous?.GapToLeader, next?.GapToLeader, amount),
-            IntervalToAhead = InterpolateTimingGap(previous?.IntervalToAhead, next?.IntervalToAhead, amount)
-        };
-    }
-
-    private static double GetInterpolationAmount(TimeSpan targetTime, TimeSpan previousTime, TimeSpan nextTime)
-    {
-        TimeSpan window = nextTime - previousTime;
-
-        if (window <= TimeSpan.Zero)
-        {
-            return 0;
-        }
-
-        double amount = (targetTime - previousTime).TotalMilliseconds / window.TotalMilliseconds;
-
-        return Math.Clamp(amount, 0, 1);
-    }
-
-    private static double GetInterpolationAmount(
-        DateTimeOffset timestamp,
-        DateTimeOffset? previousTimestamp,
-        DateTimeOffset? nextTimestamp)
-    {
-        if (previousTimestamp is null || nextTimestamp is null)
-        {
-            return 0;
-        }
-
-        TimeSpan window = nextTimestamp.Value - previousTimestamp.Value;
-
-        if (window <= TimeSpan.Zero)
-        {
-            return 0;
-        }
-
-        double amount = (timestamp - previousTimestamp.Value).TotalMilliseconds / window.TotalMilliseconds;
-
-        return Math.Clamp(amount, 0, 1);
-    }
-
-    private static int? InterpolateInt(int? previous, int? next, double amount)
-    {
-        if (previous.HasValue && next.HasValue)
-        {
-            return (int)Math.Round(previous.Value + (next.Value - previous.Value) * amount);
-        }
-
-        return previous ?? next;
-    }
-
-    private static TimingGap? InterpolateTimingGap(TimingGap? previous, TimingGap? next, double amount)
-    {
-        if (previous?.Seconds is double previousSeconds && next?.Seconds is double nextSeconds)
-        {
-            double interpolatedSeconds = previousSeconds + (nextSeconds - previousSeconds) * amount;
-            return new TimingGap(interpolatedSeconds, null);
-        }
-
-        return previous ?? next;
     }
 
     private void SortDriverRowsByPosition()
@@ -628,8 +385,6 @@ public class MainViewModel : INotifyPropertyChanged
     private void ClearReplay()
     {
         _replayTimeline = null;
-        _intervalsByDriver = new Dictionary<DriverNumber, IReadOnlyList<OpenF1IntervalSample>>();
-        _currentFrameIndex = -1;
         DurationSeconds = 0;
         SetCurrentTimeSeconds(0);
         DriverStates.Clear();
