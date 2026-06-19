@@ -5,11 +5,217 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="PitWall Replay"
-        Height="620"
-        Width="1080"
-        MinHeight="520"
-        MinWidth="860">
-    <Grid Background="#111318">
+        Height="760"
+        Width="1320"
+        MinHeight="700"
+        MinWidth="1120"
+        FontFamily="Segoe UI"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
+    <Window.Resources>
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0B0F16" />
+        <SolidColorBrush x:Key="PanelBrush" Color="#121823" />
+        <SolidColorBrush x:Key="PanelAltBrush" Color="#161D29" />
+        <SolidColorBrush x:Key="PanelRaisedBrush" Color="#1B2330" />
+        <SolidColorBrush x:Key="BorderBrushSoft" Color="#273142" />
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F4F7FB" />
+        <SolidColorBrush x:Key="TextMutedBrush" Color="#9AA6B7" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#2F9BFF" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#4DABFF" />
+        <SolidColorBrush x:Key="SuccessBrush" Color="#35D07F" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#FF5A5F" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#F9C74F" />
+
+        <Style TargetType="{x:Type Button}">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Background" Value="{StaticResource PanelRaisedBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#243044" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#3B4960" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#1B2536" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type TextBox}">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Background" Value="#0E141F" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TextBox}">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SliderRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Height="4"
+                                VerticalAlignment="Center"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="2" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Ellipse Width="15"
+                                 Height="15"
+                                 Fill="{StaticResource TextPrimaryBrush}"
+                                 Stroke="{StaticResource AccentBrush}"
+                                 StrokeThickness="2" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type Slider}">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Slider}">
+                        <Grid>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge"
+                                                  Background="{StaticResource AccentBrush}"
+                                                  Style="{StaticResource SliderRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge"
+                                                  Background="#2A3444"
+                                                  Style="{StaticResource SliderRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb />
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type ProgressBar}">
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Background" Value="#2A3444" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ProgressBar}">
+                        <Grid ClipToBounds="True">
+                            <Border x:Name="PART_Track"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="4" />
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="4" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type DataGrid}">
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="RowBackground" Value="{StaticResource PanelBrush}" />
+            <Setter Property="AlternatingRowBackground" Value="#151D29" />
+            <Setter Property="HorizontalGridLinesBrush" Value="#273142" />
+            <Setter Property="VerticalGridLinesBrush" Value="#202838" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="ColumnHeaderHeight" Value="32" />
+            <Setter Property="RowHeight" Value="28" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style TargetType="{x:Type DataGridColumnHeader}">
+            <Setter Property="Background" Value="#202A39" />
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+            <Setter Property="BorderBrush" Value="#2E394B" />
+            <Setter Property="BorderThickness" Value="0,0,1,1" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style TargetType="{x:Type DataGridCell}">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type DataGridCell}">
+                        <Border Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#174B72" />
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="{StaticResource AppBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -17,139 +223,390 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <DockPanel Grid.Row="0" Margin="16,14,16,10" LastChildFill="False">
-            <TextBlock DockPanel.Dock="Left"
-                       Text="PitWall Replay"
-                       Foreground="White"
-                       FontSize="22"
-                       FontWeight="SemiBold"
-                       VerticalAlignment="Center" />
-
-            <StackPanel DockPanel.Dock="Right"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center">
-                <TextBlock Text="Session"
-                           Foreground="#AEB4C0"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0" />
-                <TextBox Width="120"
-                         Height="30"
-                         Text="{Binding SessionKeyText, UpdateSourceTrigger=PropertyChanged}" />
-                <Button Content="Load"
-                        Width="72"
-                        Height="30"
-                        Margin="8,0,0,0"
-                        Command="{Binding LoadReplayCommand}" />
-            </StackPanel>
-        </DockPanel>
-
-        <Grid Grid.Row="1" Margin="16,0,16,14">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <Grid Grid.Row="0"
+              Margin="18,16,18,12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Row="0"
-                        Grid.Column="0"
-                        Orientation="Horizontal"
-                        Margin="0,0,14,0">
-                <Button Width="82"
-                        Height="32"
-                        Content="{Binding PlayPauseText}"
-                        Command="{Binding PlayPauseCommand}" />
-                <Button Width="72"
-                        Height="32"
-                        Margin="8,0,0,0"
-                        Content="Stop"
-                        Command="{Binding StopCommand}" />
+            <StackPanel>
+                <TextBlock Text="PitWall Replay"
+                           Foreground="{StaticResource TextPrimaryBrush}"
+                           FontSize="24"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding FrameText}"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           FontSize="12"
+                           Margin="0,2,0,0" />
             </StackPanel>
 
-            <Slider Grid.Row="0"
-                    Grid.Column="1"
-                    Minimum="0"
-                    Maximum="{Binding DurationSeconds}"
-                    Value="{Binding CurrentTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                    VerticalAlignment="Center" />
-
-            <StackPanel Grid.Row="0"
-                        Grid.Column="2"
-                        Orientation="Horizontal"
-                        Margin="14,0,0,0"
-                        VerticalAlignment="Center">
-                <TextBlock Text="{Binding CurrentTimeText}"
-                           Foreground="White"
-                           MinWidth="54"
-                           TextAlignment="Right" />
-                <TextBlock Text=" / "
-                           Foreground="#6D7480" />
-                <TextBlock Text="{Binding DurationText}"
-                           Foreground="#AEB4C0"
-                           MinWidth="54" />
-                <TextBlock Text="Speed"
-                           Foreground="#AEB4C0"
-                           Margin="18,0,8,0" />
-                <TextBox Width="54"
-                         Height="28"
-                         Text="{Binding PlaybackSpeed, UpdateSourceTrigger=PropertyChanged}" />
-                <TextBlock Text="x"
-                           Foreground="#AEB4C0"
-                           Margin="4,0,0,0" />
-            </StackPanel>
-
-            <TextBlock Grid.Row="1"
-                       Grid.Column="0"
-                       Grid.ColumnSpan="3"
-                       Text="{Binding FrameText}"
-                       Foreground="#AEB4C0"
-                       Margin="0,8,0,0" />
+            <Border Grid.Column="1"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="10">
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="Session"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0" />
+                    <TextBox Width="128"
+                             Height="32"
+                             Text="{Binding SessionKeyText, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Content="Load"
+                            Width="74"
+                            Height="32"
+                            Margin="8,0,0,0"
+                            Background="{StaticResource AccentBrush}"
+                            BorderBrush="{StaticResource AccentBrush}"
+                            Command="{Binding LoadReplayCommand}" />
+                </StackPanel>
+            </Border>
         </Grid>
 
-        <DataGrid Grid.Row="2"
-                  Margin="16,0,16,14"
-                  ItemsSource="{Binding DriverStates}"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  CanUserDeleteRows="False"
-                  CanUserReorderColumns="False"
-                  CanUserResizeRows="False"
-                  CanUserSortColumns="False"
-                  EnableColumnVirtualization="True"
-                  EnableRowVirtualization="True"
-                  VirtualizingPanel.IsVirtualizing="True"
-                  VirtualizingPanel.VirtualizationMode="Recycling"
-                  IsReadOnly="True"
-                  HeadersVisibility="Column"
-                  GridLinesVisibility="Horizontal"
-                  Background="#151922"
-                  Foreground="White"
-                  RowBackground="#151922"
-                  AlternatingRowBackground="#1B202B"
-                  BorderBrush="#2B313D"
-                  HorizontalGridLinesBrush="#2B313D">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Pos" Binding="{Binding Position}" Width="56" />
-                <DataGridTextColumn Header="No" Binding="{Binding DriverNumber}" Width="56" />
-                <DataGridTextColumn Header="Driver" Binding="{Binding DriverName}" Width="90" />
-                <DataGridTextColumn Header="Speed" Binding="{Binding Speed}" Width="90" />
-                <DataGridTextColumn Header="Gear" Binding="{Binding Gear}" Width="64" />
-                <DataGridTextColumn Header="DRS" Binding="{Binding Drs}" Width="120" />
-                <DataGridTextColumn Header="Gap" Binding="{Binding Gap}" Width="90" />
-                <DataGridTextColumn Header="Interval" Binding="{Binding Interval}" Width="90" />
-                <DataGridTextColumn Header="Lap" Binding="{Binding Lap}" Width="64" />
-                <DataGridTextColumn Header="X" Binding="{Binding X}" Width="90" />
-                <DataGridTextColumn Header="Y" Binding="{Binding Y}" Width="90" />
-            </DataGrid.Columns>
-        </DataGrid>
+        <Border Grid.Row="1"
+                Margin="18,0,18,14"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrushSoft}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="3"
-                   Margin="16,0,16,14"
-                   Text="{Binding StatusText}"
-                   Foreground="#AEB4C0"
-                   TextWrapping="Wrap" />
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            Margin="0,0,14,0">
+                    <Button Width="84"
+                            Height="34"
+                            Content="{Binding PlayPauseText}"
+                            Command="{Binding PlayPauseCommand}" />
+                    <Button Width="70"
+                            Height="34"
+                            Margin="8,0,0,0"
+                            Content="Stop"
+                            Command="{Binding StopCommand}" />
+                </StackPanel>
+
+                <Slider Grid.Column="1"
+                        Minimum="0"
+                        Maximum="{Binding DurationSeconds}"
+                        Value="{Binding CurrentTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        VerticalAlignment="Center" />
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            Margin="14,0,0,0"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="{Binding CurrentTimeText}"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontWeight="SemiBold"
+                               MinWidth="58"
+                               TextAlignment="Right" />
+                    <TextBlock Text=" / "
+                               Foreground="#657083" />
+                    <TextBlock Text="{Binding DurationText}"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               MinWidth="58" />
+                    <TextBlock Text="Speed"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               Margin="18,0,8,0" />
+                    <TextBox Width="56"
+                             Height="30"
+                             Text="{Binding PlaybackSpeed, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Text="x"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               Margin="4,0,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2"
+              Margin="18,0,18,14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="0.95*" MinHeight="250" />
+                <RowDefinition Height="14" />
+                <RowDefinition Height="1.15*" MinHeight="260" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding TrackTitle}"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Text="  Track Map"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   Text="OpenF1 location trace"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            Background="#080D14"
+                            BorderBrush="#1E2836"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            ClipToBounds="True">
+                        <Viewbox Stretch="Uniform">
+                            <Grid Width="1200"
+                                  Height="360">
+                                <Image Source="{Binding CircuitImage}"
+                                       Stretch="Uniform"
+                                       Opacity="0.12" />
+
+                                <ItemsControl ItemsSource="{Binding TrackMapPoints}"
+                                              IsHitTestVisible="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <Canvas Width="1200"
+                                                    Height="360" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Setter Property="Canvas.Left"
+                                                    Value="{Binding X}" />
+                                            <Setter Property="Canvas.Top"
+                                                    Value="{Binding Y}" />
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Ellipse Width="2.2"
+                                                     Height="2.2"
+                                                     Fill="#496075"
+                                                     Opacity="0.62" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <ItemsControl ItemsSource="{Binding MapMarkers}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <Canvas Width="1200"
+                                                    Height="360" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Setter Property="Canvas.Left"
+                                                    Value="{Binding X}" />
+                                            <Setter Property="Canvas.Top"
+                                                    Value="{Binding Y}" />
+                                            <Setter Property="Visibility"
+                                                    Value="{Binding Visibility}" />
+                                            <Setter Property="Opacity"
+                                                    Value="{Binding MarkerOpacity}" />
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Width="58"
+                                                  Height="22">
+                                                <Ellipse Width="20"
+                                                         Height="20"
+                                                         HorizontalAlignment="Left"
+                                                         Fill="{Binding MarkerBrush}"
+                                                         Stroke="{Binding StrokeBrush}"
+                                                         StrokeThickness="{Binding StrokeThickness}" />
+                                                <Border Margin="24,1,0,1"
+                                                        Padding="4,0"
+                                                        Background="#CC0B1018"
+                                                        CornerRadius="4">
+                                                    <TextBlock Text="{Binding Label}"
+                                                               Foreground="White"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </Viewbox>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="340" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Background="{StaticResource PanelBrush}"
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="14"
+                        DataContext="{Binding SelectedDriver}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <DockPanel Margin="0,0,0,18">
+                            <Border DockPanel.Dock="Left"
+                                    Width="7"
+                                    Height="42"
+                                    Background="{Binding TeamBrush}"
+                                    CornerRadius="3"
+                                    Margin="0,0,12,0" />
+                            <StackPanel>
+                                <TextBlock Text="{Binding DriverName, FallbackValue=Select driver}"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontSize="18"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="12"
+                                           Margin="0,2,0,0">
+                                    <Run Text="#" />
+                                    <Run Text="{Binding DriverNumber, Mode=OneWay}" />
+                                    <Run Text="  P" />
+                                    <Run Text="{Binding Position, Mode=OneWay}" />
+                                    <Run Text="  " />
+                                    <Run Text="{Binding Speed, Mode=OneWay}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <StackPanel Grid.Row="1">
+                            <TextBlock Text="Telemetry"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,12" />
+
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="52" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Throttle"
+                                           Foreground="{StaticResource TextMutedBrush}" />
+                                <ProgressBar Grid.Column="1"
+                                             Value="{Binding ThrottlePercent, Mode=OneWay}"
+                                             Foreground="{StaticResource SuccessBrush}" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding ThrottleText}"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold"
+                                           TextAlignment="Right" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="52" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Brake"
+                                           Foreground="{StaticResource TextMutedBrush}" />
+                                <ProgressBar Grid.Column="1"
+                                             Value="{Binding BrakePercent, Mode=OneWay}"
+                                             Foreground="{StaticResource DangerBrush}" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding BrakeText}"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold"
+                                           TextAlignment="Right" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="52" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="RPM"
+                                           Foreground="{StaticResource TextMutedBrush}" />
+                                <ProgressBar Grid.Column="1"
+                                             Value="{Binding RpmPercent, Mode=OneWay}"
+                                             Foreground="{StaticResource WarningBrush}" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding RpmText}"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold"
+                                           TextAlignment="Right" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <DataGrid Grid.Column="2"
+                          ItemsSource="{Binding DriverStates}"
+                          SelectedItem="{Binding SelectedDriver, Mode=TwoWay}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserReorderColumns="False"
+                          CanUserResizeRows="False"
+                          CanUserSortColumns="False"
+                          EnableColumnVirtualization="True"
+                          EnableRowVirtualization="True"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          IsReadOnly="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Pos" Binding="{Binding Position}" Width="56" />
+                        <DataGridTextColumn Header="No" Binding="{Binding DriverNumber}" Width="56" />
+                        <DataGridTextColumn Header="Driver" Binding="{Binding DriverName}" Width="92" />
+                        <DataGridTextColumn Header="Speed" Binding="{Binding Speed}" Width="92" />
+                        <DataGridTextColumn Header="Gear" Binding="{Binding Gear}" Width="64" />
+                        <DataGridTextColumn Header="DRS" Binding="{Binding Drs}" Width="110" />
+                        <DataGridTextColumn Header="Gap" Binding="{Binding Gap}" Width="90" />
+                        <DataGridTextColumn Header="Interval" Binding="{Binding Interval}" Width="90" />
+                        <DataGridTextColumn Header="Lap" Binding="{Binding Lap}" Width="64" />
+                        <DataGridTextColumn Header="X" Binding="{Binding X}" Width="90" />
+                        <DataGridTextColumn Header="Y" Binding="{Binding Y}" Width="90" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="3"
+                Background="#08101A"
+                BorderBrush="#1E2836"
+                BorderThickness="1,1,0,0"
+                Padding="18,8">
+            <TextBlock Text="{Binding StatusText}"
+                       Foreground="{StaticResource TextMutedBrush}"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
+        </Border>
     </Grid>
 </Window>

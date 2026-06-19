@@ -4,8 +4,10 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using PitWall.Commands;
 using PitWall.Models;
 using PitWall.Models.OpenF1Api;
@@ -20,9 +22,14 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly Stopwatch _playbackClock = new();
     private ReplayTimeline? _replayTimeline;
     private readonly Dictionary<DriverNumber, ReplayDriverRow> _driverRowsByNumber = new();
+    private readonly Dictionary<DriverNumber, ReplayMapMarker> _mapMarkersByNumber = new();
+    private TrackMapBounds _trackMapBounds = TrackMapBounds.Empty;
+    private ReplayDriverRow? _selectedDriver;
     private TimeSpan _playbackStartTime;
     private string _sessionKeyText = "latest";
     private string _statusText = "Enter a session key and load replay data.";
+    private string _trackTitle = "No session loaded";
+    private ImageSource? _circuitImage;
     private double _currentTimeSeconds;
     private double _durationSeconds;
     private double _playbackSpeed = 1.0;
@@ -48,6 +55,8 @@ public class MainViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<ReplayDriverRow> DriverStates { get; } = new();
+    public ObservableCollection<ReplayMapMarker> MapMarkers { get; } = new();
+    public ObservableCollection<TrackMapPoint> TrackMapPoints { get; } = new();
 
     public ICommand LoadReplayCommand { get; }
     public ICommand PlayPauseCommand { get; }
@@ -65,12 +74,36 @@ public class MainViewModel : INotifyPropertyChanged
         private set => SetProperty(ref _statusText, value);
     }
 
+    public string TrackTitle
+    {
+        get => _trackTitle;
+        private set => SetProperty(ref _trackTitle, value);
+    }
+
+    public ImageSource? CircuitImage
+    {
+        get => _circuitImage;
+        private set => SetProperty(ref _circuitImage, value);
+    }
+
+    public ReplayDriverRow? SelectedDriver
+    {
+        get => _selectedDriver;
+        set
+        {
+            if (SetProperty(ref _selectedDriver, value))
+            {
+                UpdateSelectedMapMarker();
+            }
+        }
+    }
+
     public double CurrentTimeSeconds
     {
         get => _currentTimeSeconds;
         set
         {
-            double boundedValue = Math.Clamp(value, 0, DurationSeconds);
+            double boundedValue = ClampTimeSeconds(value);
 
             if (SetCurrentTimeSeconds(boundedValue))
             {
@@ -84,8 +117,17 @@ public class MainViewModel : INotifyPropertyChanged
         get => _durationSeconds;
         private set
         {
-            if (SetProperty(ref _durationSeconds, value))
+            double boundedValue = double.IsNaN(value) || double.IsInfinity(value)
+                ? 0
+                : Math.Max(0, value);
+
+            if (SetProperty(ref _durationSeconds, boundedValue))
             {
+                if (_currentTimeSeconds > boundedValue)
+                {
+                    SetCurrentTimeSeconds(boundedValue);
+                }
+
                 OnPropertyChanged(nameof(DurationText));
             }
         }
@@ -201,8 +243,11 @@ public class MainViewModel : INotifyPropertyChanged
     private void LoadTimeline(ReplayData replayData, ReplayTimeline timeline)
     {
         _replayTimeline = timeline;
+        DurationSeconds = Math.Max(0, timeline.Duration.TotalSeconds);
+        _trackMapBounds = TrackMapBounds.From(replayData.Locations);
+        LoadTrackMapPoints(replayData.Locations);
         InitializeDriverRows(replayData.Drivers);
-        DurationSeconds = timeline.Duration.TotalSeconds;
+        LoadTrackMetadata(replayData);
 
         if (timeline.DriverCount > 0)
         {
@@ -332,6 +377,7 @@ public class MainViewModel : INotifyPropertyChanged
     private void RefreshDriverStates(ReplayTimeline timeline, TimeSpan targetTime)
     {
         bool shouldSortRows = false;
+        DateTimeOffset playheadTimestamp = timeline.SessionStart + targetTime;
 
         for (int driverIndex = 0; driverIndex < timeline.DriverCount; driverIndex++)
         {
@@ -341,11 +387,62 @@ public class MainViewModel : INotifyPropertyChanged
             {
                 shouldSortRows |= row.Update(displayState);
             }
+
+            if (_mapMarkersByNumber.TryGetValue(displayState.DriverNumber, out ReplayMapMarker? marker))
+            {
+                marker.Update(displayState, _trackMapBounds, playheadTimestamp);
+            }
         }
 
         if (shouldSortRows)
         {
             SortDriverRowsByPosition();
+        }
+    }
+
+    private void LoadTrackMetadata(ReplayData replayData)
+    {
+        TrackTitle =
+            replayData.Meeting?.CircuitShortName ??
+            replayData.Session.CircuitShortName ??
+            replayData.Meeting?.MeetingName ??
+            replayData.Session.Location ??
+            "Track map";
+
+        CircuitImage = CreateCircuitImage(replayData.Meeting?.CircuitImage);
+    }
+
+    private void LoadTrackMapPoints(IReadOnlyList<OpenF1Location> locations)
+    {
+        TrackMapPoints.Clear();
+
+        if (!_trackMapBounds.HasBounds || locations.Count == 0)
+        {
+            return;
+        }
+
+        int stride = Math.Max(1, locations.Count / 1600);
+        HashSet<(int X, int Y)> projectedPoints = new();
+        int sampleIndex = 0;
+
+        foreach (OpenF1Location location in locations)
+        {
+            if (sampleIndex++ % stride != 0 ||
+                location.X is not int locationX ||
+                location.Y is not int locationY)
+            {
+                continue;
+            }
+
+            int projectedX = (int)Math.Round(_trackMapBounds.ProjectPointX(locationX));
+            int projectedY = (int)Math.Round(_trackMapBounds.ProjectPointY(locationY));
+
+            if (!projectedPoints.Add((projectedX, projectedY)))
+            {
+                continue;
+            }
+
+            TrackMapPoints.Add(new TrackMapPoint(projectedX, projectedY));
         }
     }
 
@@ -368,27 +465,51 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    private void UpdateSelectedMapMarker()
+    {
+        foreach (ReplayMapMarker marker in MapMarkers)
+        {
+            marker.IsSelected = SelectedDriver is not null &&
+                marker.DriverNumber == SelectedDriver.DriverNumberKey;
+        }
+    }
+
     private void InitializeDriverRows(IReadOnlyList<OpenF1Driver> drivers)
     {
         DriverStates.Clear();
+        MapMarkers.Clear();
         _driverRowsByNumber.Clear();
+        _mapMarkersByNumber.Clear();
 
         foreach (OpenF1Driver driver in drivers
             .OrderBy(driver => driver.DriverNumber.Value))
         {
             ReplayDriverRow row = ReplayDriverRow.From(driver);
+            ReplayMapMarker marker = ReplayMapMarker.From(driver);
+
             DriverStates.Add(row);
+            MapMarkers.Add(marker);
             _driverRowsByNumber[driver.DriverNumber] = row;
+            _mapMarkersByNumber[driver.DriverNumber] = marker;
         }
+
+        SelectedDriver = DriverStates.FirstOrDefault();
     }
 
     private void ClearReplay()
     {
         _replayTimeline = null;
+        _trackMapBounds = TrackMapBounds.Empty;
+        TrackTitle = "No session loaded";
+        CircuitImage = null;
+        SelectedDriver = null;
         DurationSeconds = 0;
         SetCurrentTimeSeconds(0);
         DriverStates.Clear();
+        MapMarkers.Clear();
+        TrackMapPoints.Clear();
         _driverRowsByNumber.Clear();
+        _mapMarkersByNumber.Clear();
         OnPropertyChanged(nameof(FrameText));
     }
 
@@ -425,8 +546,34 @@ public class MainViewModel : INotifyPropertyChanged
         return new SessionDataService(client, sessionCatalog);
     }
 
+    private static ImageSource? CreateCircuitImage(string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl) ||
+            !Uri.TryCreate(imageUrl, UriKind.Absolute, out Uri? uri))
+        {
+            return null;
+        }
+
+        try
+        {
+            BitmapImage image = new();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnDemand;
+            image.UriSource = uri;
+            image.EndInit();
+
+            return image;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private bool SetCurrentTimeSeconds(double value)
     {
+        value = ClampTimeSeconds(value);
+
         if (Math.Abs(_currentTimeSeconds - value) < 0.001)
         {
             return false;
@@ -437,6 +584,20 @@ public class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CurrentTimeText));
         OnPropertyChanged(nameof(FrameText));
         return true;
+    }
+
+    private double ClampTimeSeconds(double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+        {
+            return 0;
+        }
+
+        double duration = double.IsNaN(DurationSeconds) || double.IsInfinity(DurationSeconds)
+            ? 0
+            : Math.Max(0, DurationSeconds);
+
+        return duration <= 0 ? 0 : Math.Clamp(value, 0, duration);
     }
 
     private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
@@ -475,12 +636,21 @@ public class ReplayDriverRow : INotifyPropertyChanged
     private string _lap = "-";
     private string _x = "-";
     private string _y = "-";
+    private string _throttleText = "-";
+    private string _brakeText = "-";
+    private string _rpmText = "-";
+    private double _throttlePercent;
+    private double _brakePercent;
+    private double _rpmPercent;
+    private double _speedPercent;
 
     private ReplayDriverRow(OpenF1Driver? driver)
     {
+        DriverNumberKey = driver?.DriverNumber ?? default;
         SortDriverNumber = driver?.DriverNumber.Value ?? int.MaxValue;
         DriverNumber = driver?.DriverNumber.Value.ToString(CultureInfo.InvariantCulture) ?? "-";
         DriverName = driver?.NameAcronym ?? driver?.BroadcastName ?? driver?.FullName ?? "-";
+        TeamBrush = ReplayDriverRowBrushes.CreateTeamBrush(driver?.TeamColor);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -492,7 +662,9 @@ public class ReplayDriverRow : INotifyPropertyChanged
     }
 
     public string DriverNumber { get; }
+    public DriverNumber DriverNumberKey { get; }
     public string DriverName { get; }
+    public Brush TeamBrush { get; }
     public int SortPosition { get; private set; } = int.MaxValue;
     public int SortDriverNumber { get; }
 
@@ -544,6 +716,48 @@ public class ReplayDriverRow : INotifyPropertyChanged
         private set => SetProperty(ref _y, value);
     }
 
+    public string ThrottleText
+    {
+        get => _throttleText;
+        private set => SetProperty(ref _throttleText, value);
+    }
+
+    public string BrakeText
+    {
+        get => _brakeText;
+        private set => SetProperty(ref _brakeText, value);
+    }
+
+    public string RpmText
+    {
+        get => _rpmText;
+        private set => SetProperty(ref _rpmText, value);
+    }
+
+    public double ThrottlePercent
+    {
+        get => _throttlePercent;
+        private set => SetProperty(ref _throttlePercent, value);
+    }
+
+    public double BrakePercent
+    {
+        get => _brakePercent;
+        private set => SetProperty(ref _brakePercent, value);
+    }
+
+    public double RpmPercent
+    {
+        get => _rpmPercent;
+        private set => SetProperty(ref _rpmPercent, value);
+    }
+
+    public double SpeedPercent
+    {
+        get => _speedPercent;
+        private set => SetProperty(ref _speedPercent, value);
+    }
+
     public static ReplayDriverRow From(OpenF1Driver? driver)
     {
         return new ReplayDriverRow(driver);
@@ -558,6 +772,13 @@ public class ReplayDriverRow : INotifyPropertyChanged
         Speed = FormatNullable(state.Telemetry?.Speed, " km/h");
         Gear = state.Telemetry?.Gear?.ToString(CultureInfo.InvariantCulture) ?? "-";
         Drs = state.Telemetry?.Drs?.ToString() ?? "-";
+        ThrottleText = FormatPercent(state.Telemetry?.Throttle);
+        BrakeText = FormatPercent(state.Telemetry?.Brake);
+        RpmText = state.Telemetry?.Rpm?.ToString("N0", CultureInfo.InvariantCulture) ?? "-";
+        ThrottlePercent = ClampPercent(state.Telemetry?.Throttle);
+        BrakePercent = ClampPercent(state.Telemetry?.Brake);
+        RpmPercent = ClampPercent((state.Telemetry?.Rpm ?? 0) / 15000.0 * 100.0);
+        SpeedPercent = ClampPercent((state.Telemetry?.Speed ?? 0) / 380.0 * 100.0);
         Gap = FormatTimingGap(state.Interval?.GapToLeader);
         Interval = FormatTimingGap(state.Interval?.IntervalToAhead);
         Lap = state.CurrentLap?.LapNumber.Value.ToString(CultureInfo.InvariantCulture) ?? "-";
@@ -572,6 +793,23 @@ public class ReplayDriverRow : INotifyPropertyChanged
         return value.HasValue
             ? $"{value.Value.ToString(CultureInfo.InvariantCulture)}{suffix}"
             : "-";
+    }
+
+    private static string FormatPercent(int? value)
+    {
+        return value.HasValue
+            ? $"{Math.Clamp(value.Value, 0, 100).ToString(CultureInfo.InvariantCulture)}%"
+            : "-";
+    }
+
+    private static double ClampPercent(int? value)
+    {
+        return value.HasValue ? Math.Clamp(value.Value, 0, 100) : 0;
+    }
+
+    private static double ClampPercent(double value)
+    {
+        return Math.Clamp(value, 0, 100);
     }
 
     private static string FormatTimingGap(TimingGap? gap)
@@ -589,9 +827,9 @@ public class ReplayDriverRow : INotifyPropertyChanged
         return string.IsNullOrWhiteSpace(gap.Value.RawValue) ? "-" : gap.Value.RawValue;
     }
 
-    private bool SetProperty(ref string field, string value, [CallerMemberName] string? propertyName = null)
+    private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
-        if (field == value)
+        if (EqualityComparer<T>.Default.Equals(field, value))
         {
             return false;
         }
@@ -599,5 +837,289 @@ public class ReplayDriverRow : INotifyPropertyChanged
         field = value;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         return true;
+    }
+}
+
+public class ReplayMapMarker : INotifyPropertyChanged
+{
+    private const double MovementDeadband = 0.35;
+    private const int SpeedChangeDeadband = 1;
+    private static readonly TimeSpan StationaryAfter = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan ResetTrackingAfterJump = TimeSpan.FromSeconds(5);
+
+    private double _x = -100;
+    private double _y = -100;
+    private double _markerOpacity = 1.0;
+    private Visibility _visibility = Visibility.Hidden;
+    private bool _isSelected;
+    private int? _lastSpeed;
+    private DateTimeOffset? _lastActivityTimestamp;
+    private DateTimeOffset? _lastUpdateTimestamp;
+    private Brush _strokeBrush = Brushes.White;
+    private double _strokeThickness = 1.5;
+
+    private ReplayMapMarker(OpenF1Driver driver)
+    {
+        DriverNumber = driver.DriverNumber;
+        Label = driver.NameAcronym ?? driver.DriverNumber.Value.ToString(CultureInfo.InvariantCulture);
+        MarkerBrush = ReplayDriverRowBrushes.CreateTeamBrush(driver.TeamColor);
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public DriverNumber DriverNumber { get; }
+    public string Label { get; }
+    public Brush MarkerBrush { get; }
+
+    public double X
+    {
+        get => _x;
+        private set => SetProperty(ref _x, value);
+    }
+
+    public double Y
+    {
+        get => _y;
+        private set => SetProperty(ref _y, value);
+    }
+
+    public Visibility Visibility
+    {
+        get => _visibility;
+        private set => SetProperty(ref _visibility, value);
+    }
+
+    public double MarkerOpacity
+    {
+        get => _markerOpacity;
+        private set => SetProperty(ref _markerOpacity, value);
+    }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (SetProperty(ref _isSelected, value))
+            {
+                StrokeBrush = value ? Brushes.White : Brushes.Black;
+                StrokeThickness = value ? 3.0 : 1.5;
+            }
+        }
+    }
+
+    public Brush StrokeBrush
+    {
+        get => _strokeBrush;
+        private set => SetProperty(ref _strokeBrush, value);
+    }
+
+    public double StrokeThickness
+    {
+        get => _strokeThickness;
+        private set => SetProperty(ref _strokeThickness, value);
+    }
+
+    public static ReplayMapMarker From(OpenF1Driver driver)
+    {
+        return new ReplayMapMarker(driver);
+    }
+
+    public void Update(DriverReplayState state, TrackMapBounds bounds, DateTimeOffset playheadTimestamp)
+    {
+        if (!bounds.HasBounds ||
+            state.Location?.X is not int locationX ||
+            state.Location?.Y is not int locationY)
+        {
+            Visibility = Visibility.Hidden;
+            ResetActivityTracking();
+            return;
+        }
+
+        double targetX = bounds.ProjectX(locationX);
+        double targetY = bounds.ProjectY(locationY);
+        int? speed = state.Telemetry?.Speed;
+
+        ResetActivityTrackingIfNeeded(playheadTimestamp);
+
+        bool locationChanged = ShouldMoveTo(targetX, targetY);
+        bool speedChanged = HasSpeedChanged(speed);
+
+        if (locationChanged)
+        {
+            X = targetX;
+            Y = targetY;
+        }
+
+        if (locationChanged || speedChanged)
+        {
+            _lastActivityTimestamp = playheadTimestamp;
+        }
+
+        MarkerOpacity = IsInactive(speed, speedChanged, playheadTimestamp) ? 0.22 : 1.0;
+        Visibility = Visibility.Visible;
+        _lastSpeed = speed;
+        _lastUpdateTimestamp = playheadTimestamp;
+    }
+
+    private bool ShouldMoveTo(double targetX, double targetY)
+    {
+        return GetDistanceTo(targetX, targetY) > MovementDeadband;
+    }
+
+    private double GetDistanceTo(double targetX, double targetY)
+    {
+        double deltaX = targetX - X;
+        double deltaY = targetY - Y;
+
+        return Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+    }
+
+    private bool HasSpeedChanged(int? speed)
+    {
+        if (speed is null || _lastSpeed is null)
+        {
+            return false;
+        }
+
+        return Math.Abs(speed.Value - _lastSpeed.Value) > SpeedChangeDeadband;
+    }
+
+    private bool IsInactive(int? speed, bool speedChanged, DateTimeOffset playheadTimestamp)
+    {
+        if (_lastActivityTimestamp is not DateTimeOffset lastActivity ||
+            playheadTimestamp - lastActivity <= StationaryAfter)
+        {
+            return false;
+        }
+
+        return speed is null || speed.Value <= SpeedChangeDeadband || !speedChanged;
+    }
+
+    private void ResetActivityTrackingIfNeeded(DateTimeOffset playheadTimestamp)
+    {
+        if (_lastUpdateTimestamp is null ||
+            playheadTimestamp < _lastUpdateTimestamp ||
+            playheadTimestamp - _lastUpdateTimestamp > ResetTrackingAfterJump)
+        {
+            _lastActivityTimestamp = playheadTimestamp;
+            _lastSpeed = null;
+        }
+    }
+
+    private void ResetActivityTracking()
+    {
+        _lastActivityTimestamp = null;
+        _lastUpdateTimestamp = null;
+        _lastSpeed = null;
+        MarkerOpacity = 1.0;
+    }
+
+    private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+        {
+            return false;
+        }
+
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        return true;
+    }
+}
+
+public readonly record struct TrackMapBounds(
+    int MinX,
+    int MaxX,
+    int MinY,
+    int MaxY,
+    bool HasBounds)
+{
+    private const double CanvasWidth = 1200;
+    private const double CanvasHeight = 360;
+    private const double Padding = 34;
+    private const double MarkerHalfWidth = 21;
+    private const double MarkerHalfHeight = 10;
+
+    public static TrackMapBounds Empty => new(0, 0, 0, 0, false);
+
+    public static TrackMapBounds From(IEnumerable<OpenF1Location> locations)
+    {
+        List<OpenF1Location> validLocations = locations
+            .Where(location => location.X.HasValue && location.Y.HasValue)
+            .ToList();
+
+        if (validLocations.Count == 0)
+        {
+            return Empty;
+        }
+
+        int minX = validLocations.Min(location => location.X!.Value);
+        int maxX = validLocations.Max(location => location.X!.Value);
+        int minY = validLocations.Min(location => location.Y!.Value);
+        int maxY = validLocations.Max(location => location.Y!.Value);
+
+        if (minX == maxX)
+        {
+            minX--;
+            maxX++;
+        }
+
+        if (minY == maxY)
+        {
+            minY--;
+            maxY++;
+        }
+
+        return new TrackMapBounds(minX, maxX, minY, maxY, true);
+    }
+
+    public double ProjectX(int x)
+    {
+        return ProjectPointX(x) - MarkerHalfWidth;
+    }
+
+    public double ProjectY(int y)
+    {
+        return ProjectPointY(y) - MarkerHalfHeight;
+    }
+
+    public double ProjectPointX(double x)
+    {
+        double amount = (x - MinX) / (double)(MaxX - MinX);
+        return Padding + amount * (CanvasWidth - Padding * 2);
+    }
+
+    public double ProjectPointY(double y)
+    {
+        double amount = (y - MinY) / (double)(MaxY - MinY);
+        return Padding + (1 - amount) * (CanvasHeight - Padding * 2);
+    }
+}
+
+public readonly record struct TrackMapPoint(double X, double Y);
+
+public static class ReplayDriverRowBrushes
+{
+    public static Brush CreateTeamBrush(PitWall.Models.Color? teamColor)
+    {
+        if (teamColor is null || teamColor.Value.HexCode.Length < 6)
+        {
+            return Brushes.Gray;
+        }
+
+        try
+        {
+            SolidColorBrush brush = new(System.Windows.Media.Color.FromRgb(
+                teamColor.Value.R,
+                teamColor.Value.G,
+                teamColor.Value.B));
+            brush.Freeze();
+            return brush;
+        }
+        catch
+        {
+            return Brushes.Gray;
+        }
     }
 }

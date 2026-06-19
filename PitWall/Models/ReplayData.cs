@@ -10,6 +10,7 @@ public record ReplayData(
     IReadOnlyList<OpenF1CarTelemetrySample> CarTelementry,
     IReadOnlyList<OpenF1IntervalSample> Intervals,
     IReadOnlyList<OpenF1Lap> Laps,
-    IReadOnlyList<OpenF1RaceControlMessage> RaceControl)
+    IReadOnlyList<OpenF1RaceControlMessage> RaceControl,
+    OpenF1Meeting? Meeting = null)
 {
 }

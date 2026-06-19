@@ -53,7 +53,7 @@ public class DriverReplayStream
         return new DriverReplayState(
             DriverNumber,
             Position: SampleLatest(Positions, timestamp, position => position.Timestamp)?.Position,
-            Location: SampleInterpolatedLocation(Locations, timestamp),
+            Location: SampleLightlyInterpolatedLocation(Locations, timestamp),
             Telemetry: SampleInterpolatedTelemetry(Telemetry, timestamp),
             Interval: SampleInterpolatedInterval(Intervals, timestamp),
             CurrentLap: SampleLatest(Laps, timestamp, lap => lap.TimestampStart),
@@ -67,28 +67,30 @@ public class DriverReplayStream
 
         return index >= 0 ? samples[index] : null;
     }
-    private static OpenF1Location? SampleInterpolatedLocation(IReadOnlyList<OpenF1Location> samples, DateTimeOffset timestamp)
+
+    private static OpenF1Location? SampleLightlyInterpolatedLocation(IReadOnlyList<OpenF1Location> samples, DateTimeOffset timestamp)
     {
-        if(!TryGetInterpolationSamples(
+        if (!TryGetInterpolationSamples(
             samples,
             timestamp,
-            data => data.Timestamp,
-            TimeSpan.FromSeconds(1),
+            location => location.Timestamp,
+            TimeSpan.FromMilliseconds(500),
             out OpenF1Location? previous,
             out OpenF1Location? next,
             out double amount))
         {
-            return SampleLatest(samples, timestamp, data => data.Timestamp);
+            return SampleLatest(samples, timestamp, location => location.Timestamp);
         }
 
         return previous! with
         {
             Timestamp = timestamp,
             X = Lerp(previous.X, next!.X, amount),
-            Y = Lerp(previous.Y, next!.Y, amount),
-            Z = Lerp(previous.Z, next!.Z, amount)
+            Y = Lerp(previous.Y, next.Y, amount),
+            Z = Lerp(previous.Z, next.Z, amount)
         };
     }
+
     private static OpenF1CarTelemetrySample? SampleInterpolatedTelemetry(IReadOnlyList<OpenF1CarTelemetrySample> samples, DateTimeOffset timestamp)
     {
         if (!TryGetInterpolationSamples(
