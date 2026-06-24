@@ -1,4 +1,8 @@
-﻿using System.Diagnostics;
+﻿using PitWall.Models;
+using PitWall.Services;
+using PitWall.ViewModels;
+using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
 using System.Windows;
@@ -11,8 +15,6 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Xml.Linq;
-using PitWall.Services;
-using PitWall.ViewModels;
 
 namespace PitWall
 {
@@ -23,8 +25,6 @@ namespace PitWall
             InitializeComponent();
 
             DataContext = new MainViewModel();
-
-            Loaded += async (s, e) => await Testy();
         }
 
         public async Task Testy()
@@ -32,7 +32,20 @@ namespace PitWall
             HttpClient httpClient = new HttpClient();
             OpenF1APIService apiService = new OpenF1APIService(httpClient);
             OpenF1Client client = new OpenF1Client(apiService);
-            await client.Test();
+            SessionCatalogService sessionCatalog = new SessionCatalogService(client);
+            SessionDataService sessionData = new SessionDataService(client, sessionCatalog);
+            ReplayFrameBuilder replayFrameBuilder = new ReplayFrameBuilder();
+
+            CalendarMeeting silverstoneMeeting = await sessionCatalog.GetCalendarMeetingAsync(2025, "silverstone");
+            OpenF1Session? silverstoneRace = silverstoneMeeting.GetMainRaceSession();
+            if(silverstoneRace is not null)
+            {
+                ReplayData silverstoneReplayData = await sessionData.LoadReplayDataAsync(
+                    silverstoneRace.SessionKey
+                );
+
+                IReadOnlyList<ReplayFrame> replayFrames = replayFrameBuilder.BuildFrames(silverstoneReplayData);
+            } 
         }
     }
 
