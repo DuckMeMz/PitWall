@@ -33,4 +33,8 @@
     <Resource Include="Assets\Images\Icon.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Models\Identifiers\" />
+  </ItemGroup>
+
 </Project>
