@@ -71,6 +71,12 @@ public class SessionDataService
     {
         OpenF1Session session = await GetSingleSession(sessionKey, cancellationToken);
 
+        Task<IReadOnlyList<OpenF1Meeting>> meetingTask = LoadOptionalReplayStreamAsync(
+            "meeting",
+            () => _client.GetMeetingsAsync(
+                cancellationToken: cancellationToken,
+                meetingKey: session.MeetingKey));
+
         IReadOnlyList<OpenF1Driver> drivers = await _client.GetDriversAsync(
             cancellationToken: cancellationToken,
             sessionKey: sessionKey);
@@ -121,12 +127,15 @@ public class SessionDataService
                 sessionKey: sessionKey));
 
         await Task.WhenAll(
+            meetingTask,
             locationsTask,
             positionUpdatesTask,
             carTelemetryTask,
             intervalsTask,
             lapsTask,
             raceControlMessagesTask);
+
+        OpenF1Meeting? meeting = (await meetingTask).FirstOrDefault();
 
         return new ReplayData(
             session,
@@ -136,7 +145,8 @@ public class SessionDataService
             await carTelemetryTask,
             await intervalsTask,
             await lapsTask,
-            await raceControlMessagesTask);
+            await raceControlMessagesTask,
+            meeting);
     }
 
     private static async Task<IReadOnlyList<T>> LoadOptionalReplayStreamAsync<T>(

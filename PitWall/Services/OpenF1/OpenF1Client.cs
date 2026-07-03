@@ -1,6 +1,6 @@
 using PitWall.Models;
 using PitWall.Models.OpenF1Api;
-using System.Diagnostics;
+
 
 namespace PitWall.Services;
 
@@ -13,13 +13,6 @@ public class OpenF1Client
         _apiService = apiService;
     }
 
-    public async Task Test()
-    {
-        IReadOnlyList<OpenF1Driver> allDrivers = await GetDriversAsync();
-
-        Debug.WriteLine(string.Join("\n", allDrivers.Select(driver => driver)));
-
-    }
 
     private async Task<IReadOnlyList<T>> FetchEndpointAsync<T>(
         OpenF1APIEndpoint endPoint,
@@ -29,7 +22,7 @@ public class OpenF1Client
         CancellationToken cancellationToken = default,
         params Filter[] extraFilters)
     {
-        APIParam query = new(endPoint);
+        ApiParams query = new(endPoint);
 
         if (sessionKey.HasValue)
             query.WithSession(sessionKey.Value);

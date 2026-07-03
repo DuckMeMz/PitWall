@@ -1,38 +1,35 @@
 ﻿using System.ComponentModel;
-using System.Diagnostics;
-using System.Net.Sockets;
+
 using System.Reflection;
-using System.Runtime.InteropServices;
-using Microsoft.AspNetCore.WebUtilities;
 namespace PitWall.Models;
 
-public record APIParam
+public record ApiParams
 {
     public OpenF1APIEndpoint EndPoint { get; init; }
     public List<Filter> Filters { get; init; } = new();
 
-    public APIParam(OpenF1APIEndpoint endpoint)
+    public ApiParams(OpenF1APIEndpoint endpoint)
     {
         EndPoint = endpoint;
     }
 
-    public APIParam WithSession(SessionKey sessionKey) =>
+    public ApiParams WithSession(SessionKey sessionKey) =>
         WithFilter(Filter.Equal(ApiFields.SessionKey, sessionKey));
 
-    public APIParam WithMeeting(MeetingKey meetingKey) =>
+    public ApiParams WithMeeting(MeetingKey meetingKey) =>
         WithFilter(Filter.Equal(ApiFields.MeetingKey, meetingKey));
 
-    public APIParam WithDriver(DriverNumber driverNumber) =>
+    public ApiParams WithDriver(DriverNumber driverNumber) =>
         WithFilter(Filter.Equal(ApiFields.DriverNumber, driverNumber));
 
 
-    public APIParam WithFilter(Filter filter)
+    public ApiParams WithFilter(Filter filter)
     {
         Filters.Add(filter);
         return this;
     }
 
-    public APIParam WithFilters(IEnumerable<Filter> filters)
+    public ApiParams WithFilters(IEnumerable<Filter> filters)
     {
         Filters.AddRange(filters);
         return this;
@@ -46,7 +43,7 @@ public record APIParam
             ? baseEndpoint
             : $"{baseEndpoint}?{string.Join("&", Filters.Select(f => f.Expression))}";
 
-        Debug.WriteLine($"Relative Url: {RelativeUrl}");
+
 
         return RelativeUrl;
     }

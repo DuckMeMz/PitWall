@@ -1,29 +1,24 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Windows.Input;
 
 namespace PitWall.Commands;
 
 public class RelayCommand : ICommand
 {
-    private readonly Action callback;
+    private readonly Action _execute;
 
-    public event EventHandler? CanExecuteChanged;
-
-    public RelayCommand(Action _callback)
+    public RelayCommand(Action execute)
     {
-        if (_callback == null) return;
-        callback = _callback;
+        _execute = execute ?? throw new ArgumentNullException(nameof(execute));
     }
 
-    public bool CanExecute(object? _parameter)
+    public event EventHandler? CanExecuteChanged
     {
-        return callback != null;
+        add { }
+        remove { }
     }
 
-    public void Execute(object? _parameter)
-    {
-        callback();
-    }
+    public bool CanExecute(object? parameter) => true;
+
+    public void Execute(object? parameter) => _execute();
 }

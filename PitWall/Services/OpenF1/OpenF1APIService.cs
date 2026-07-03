@@ -39,13 +39,13 @@ public class OpenF1APIService
             .Build();
     }
 
-    public async Task<IReadOnlyList<T>> FetchDataAsync<T>(APIParam parameters, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<T>> FetchDataAsync<T>(ApiParams parameters, CancellationToken cancellationToken = default)
     {
         string finalUrl = $"{_baseUrl}{parameters.GetRelativeUrl()}";
 
         Debug.WriteLine($"Fetching: {finalUrl}");
 
-        HttpResponseMessage response = await _pipeline.ExecuteAsync(
+        using HttpResponseMessage response = await _pipeline.ExecuteAsync(
             async token => await _httpClient.GetAsync(finalUrl, token),
             cancellationToken);
 

@@ -3,7 +3,7 @@
 public record OpenF1Location
 {
     [System.Text.Json.Serialization.JsonPropertyName("date")]
-    public DateTimeOffset? TimestampStart { get; init; }
+    public DateTimeOffset? Timestamp { get; init; }
     public MeetingKey MeetingKey { get; init; }
     public SessionKey SessionKey { get; init; }
     public DriverNumber DriverNumber { get; init; }

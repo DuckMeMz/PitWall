@@ -2,7 +2,7 @@ using System.Windows.Input;
 
 namespace PitWall.Commands;
 
-public sealed class AsyncRelayCommand : ICommand
+public class AsyncRelayCommand : ICommand
 {
     private readonly Func<Task> _execute;
     private readonly Func<bool>? _canExecute;

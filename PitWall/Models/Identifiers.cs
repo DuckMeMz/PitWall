@@ -1,5 +1,5 @@
 ﻿using System.ComponentModel;
-using System.Diagnostics;
+
 using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Windows.Automation.Provider;
@@ -318,7 +318,6 @@ public static class ApiQueryValueExtensions
             .OfType<ApiQueryValueAttribute>()
             .FirstOrDefault();
 
-        Debug.WriteLine($"Attribute: {attribute}");
 
         return attribute?.Value ?? value.ToString();
     }
