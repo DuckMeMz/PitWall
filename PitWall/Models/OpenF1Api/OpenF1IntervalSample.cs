@@ -8,6 +8,7 @@ public record OpenF1IntervalSample
     public SessionKey SessionKey { get; init; }
     public DriverNumber DriverNumber { get; init; }
     public TimingGap? GapToLeader { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("interval")]
     public TimingGap? IntervalToAhead { get; init; }
 }
 

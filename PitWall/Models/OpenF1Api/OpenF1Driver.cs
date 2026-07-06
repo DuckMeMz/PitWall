@@ -9,6 +9,7 @@ public record OpenF1Driver
     public string? HeadshotUrl { get; init; }
     public string? LastName { get; init; }
     public string? NameAcronym { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("team_colour")]
     public Color? TeamColor { get; init; }
     public TeamName? TeamName { get; init; }
     public MeetingKey MeetingKey { get; init; }

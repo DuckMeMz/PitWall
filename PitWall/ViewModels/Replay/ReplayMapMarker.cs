@@ -23,12 +23,12 @@ public class ReplayMapMarker : BindableBase
         Label =
             driver.NameAcronym ??
             driver.DriverNumber.Value.ToString(CultureInfo.InvariantCulture);
-        MarkerBrush = ReplayDriverRow.CreateTeamBrush(driver.TeamColor);
+        TeamBrush = ReplayDriverRow.CreateTeamBrush(driver.TeamColor);
     }
 
     public DriverNumber DriverNumber { get; }
     public string Label { get; }
-    public Brush MarkerBrush { get; }
+    public Brush TeamBrush { get; }
 
     public double X
     {

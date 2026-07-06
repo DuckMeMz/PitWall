@@ -1,6 +1,7 @@
 using PitWall.Models;
 using PitWall.Models.OpenF1Api;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 
@@ -37,8 +38,8 @@ public class ReplayDriverRow : INotifyPropertyChanged
     public int? Brake => _state.Telemetry?.Brake;
     public int? Rpm => _state.Telemetry?.Rpm;
 
-    public TimingGap? Gap => _state.Interval?.GapToLeader;
-    public TimingGap? Interval => _state.Interval?.IntervalToAhead;
+    public string Gap => FormatTimingGap(_state.Interval?.GapToLeader);
+    public string Interval => FormatTimingGap(_state.Interval?.IntervalToAhead);
 
     public LapNumber? Lap => _state.CurrentLap?.LapNumber;
     public int? X => _state.Location?.X;
@@ -109,6 +110,23 @@ public class ReplayDriverRow : INotifyPropertyChanged
 
         OnPropertyChanged(propertyName);
         return true;
+    }
+
+    private static string FormatTimingGap(TimingGap? timingGap)
+    {
+        if (timingGap is not TimingGap value)
+        {
+            return "-";
+        }
+
+        if (value.Seconds is double seconds)
+        {
+            return seconds.ToString("0.000", CultureInfo.InvariantCulture);
+        }
+
+        return string.IsNullOrWhiteSpace(value.RawValue)
+            ? "-"
+            : value.RawValue;
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

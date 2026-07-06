@@ -68,7 +68,8 @@
             <Setter Property="Background" Value="#0E141F" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type TextBox}">
@@ -78,7 +79,8 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="5">
                             <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="{TemplateBinding Padding}" />
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsKeyboardFocused" Value="True">
@@ -430,7 +432,7 @@
                                                 <Ellipse Width="20"
                                                          Height="20"
                                                          HorizontalAlignment="Left"
-                                                         Fill="{Binding MarkerBrush}">
+                                                         Fill="{Binding TeamBrush}">
                                                     <Ellipse.Style>
                                                         <Style TargetType="Ellipse">
                                                             <Setter Property="Stroke"
@@ -452,6 +454,8 @@
                                                 <Border Margin="24,1,0,1"
                                                         Padding="4,0"
                                                         Background="#CC0B1018"
+                                                        BorderBrush="{Binding TeamBrush}"
+                                                        BorderThickness="1"
                                                         CornerRadius="4">
                                                     <TextBlock Text="{Binding Label}"
                                                                Foreground="White"
@@ -599,8 +603,8 @@
                         <DataGridTextColumn Header="Speed" Binding="{Binding Speed, TargetNullValue=-}" Width="92" />
                         <DataGridTextColumn Header="Gear" Binding="{Binding Gear, TargetNullValue=-}" Width="64" />
                         <DataGridTextColumn Header="DRS" Binding="{Binding Drs, TargetNullValue=-}" Width="110" />
-                        <DataGridTextColumn Header="Gap" Binding="{Binding Gap, TargetNullValue=-}" Width="90" />
-                        <DataGridTextColumn Header="Interval" Binding="{Binding Interval, TargetNullValue=-}" Width="90" />
+                        <DataGridTextColumn Header="To Leader" Binding="{Binding Gap, TargetNullValue=-}" Width="90" />
+                        <DataGridTextColumn Header="To Ahead" Binding="{Binding Interval}" Width="90" />
                         <DataGridTextColumn Header="Lap" Binding="{Binding Lap, TargetNullValue=-}" Width="64" />
                         <DataGridTextColumn Header="X" Binding="{Binding X, TargetNullValue=-}" Width="90" />
                         <DataGridTextColumn Header="Y" Binding="{Binding Y, TargetNullValue=-}" Width="90" />
