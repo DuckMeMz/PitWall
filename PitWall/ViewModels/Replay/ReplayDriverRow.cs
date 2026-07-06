@@ -34,6 +34,7 @@ public class ReplayDriverRow : INotifyPropertyChanged
     public int? Speed => _state.Telemetry?.Speed;
     public int? Gear => _state.Telemetry?.Gear;
     public DrsState? Drs => _state.Telemetry?.Drs;
+    public string DrsText => FormatDrs(Drs);
     public int? Throttle => _state.Telemetry?.Throttle;
     public int? Brake => _state.Telemetry?.Brake;
     public int? Rpm => _state.Telemetry?.Rpm;
@@ -74,7 +75,13 @@ public class ReplayDriverRow : INotifyPropertyChanged
 
         NotifyIfChanged(previousState.Telemetry?.Speed, state.Telemetry?.Speed, nameof(Speed));
         NotifyIfChanged(previousState.Telemetry?.Gear, state.Telemetry?.Gear, nameof(Gear));
-        NotifyIfChanged(previousState.Telemetry?.Drs, state.Telemetry?.Drs, nameof(Drs));
+        if (NotifyIfChanged(
+            previousState.Telemetry?.Drs,
+            state.Telemetry?.Drs,
+            nameof(Drs)))
+        {
+            OnPropertyChanged(nameof(DrsText));
+        }
         NotifyIfChanged(previousState.Telemetry?.Throttle, state.Telemetry?.Throttle, nameof(Throttle));
         NotifyIfChanged(previousState.Telemetry?.Brake, state.Telemetry?.Brake, nameof(Brake));
 
@@ -127,6 +134,18 @@ public class ReplayDriverRow : INotifyPropertyChanged
         return string.IsNullOrWhiteSpace(value.RawValue)
             ? "-"
             : value.RawValue;
+    }
+
+    private static string FormatDrs(DrsState? state)
+    {
+        return state switch
+        {
+            DrsState.Off or DrsState.OffAlternative => "Off",
+            DrsState.DetectedEligible => "Eligible",
+            DrsState.On or DrsState.OnAlternativeA or DrsState.OnAlternativeB => "On",
+            null => "-",
+            _ => "Unknown"
+        };
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

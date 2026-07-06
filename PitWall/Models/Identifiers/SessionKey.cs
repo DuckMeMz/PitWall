@@ -10,8 +10,7 @@ public readonly record struct SessionKey(int Value) : IApiQueryValue
 
     public static SessionKey Latest => new(LatestValue);
 
-    public string ToQueryValue() =>
-        Value == LatestValue ? "latest" : Value.ToString();
+    public string ToQueryValue() => Value == LatestValue ? "latest" : Value.ToString();
 
     public override string ToString() => Value.ToString();
 }

@@ -9,7 +9,7 @@ namespace PitWall.ViewModels;
 
 public class TrackMapViewModel : BindableBase
 {
-    private static readonly TimeSpan MarkerStaleAfter = TimeSpan.FromSeconds(25);
+    private static readonly TimeSpan MarkerStaleAfter = TimeSpan.FromSeconds(30);
 
     private readonly Dictionary<DriverNumber, ReplayMapMarker> _markersByDriver = new();
     private TrackMapProjector _projector = TrackMapProjector.Empty;
@@ -73,7 +73,8 @@ public class TrackMapViewModel : BindableBase
 
             bool isStale =
                 state.Location is ReplayLocation location &&
-                playheadTimestamp - location.SourceTimestamp > MarkerStaleAfter;
+                playheadTimestamp - location.LastMovementTimestamp >
+                    MarkerStaleAfter;
 
             marker.Apply(position, isStale);
         }
@@ -83,9 +84,7 @@ public class TrackMapViewModel : BindableBase
     {
         foreach (ReplayMapMarker marker in MapMarkers)
         {
-            marker.IsSelected =
-                driverNumber.HasValue &&
-                marker.DriverNumber == driverNumber.Value;
+            marker.IsSelected = driverNumber.HasValue && marker.DriverNumber == driverNumber.Value;
         }
     }
 

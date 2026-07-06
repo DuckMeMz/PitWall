@@ -4,23 +4,17 @@ namespace PitWall.Models;
 
 public readonly record struct Filter(string Expression)
 {
-    public static Filter Equal<T>(ApiField<T> field, T value) =>
-        new($"{field}={Encode(value)}");
+    public static Filter Equal<T>(ApiField<T> field, T value) => new($"{field}={Encode(value)}");
 
-    public static Filter NotEqual<T>(ApiField<T> field, T value) =>
-        new($"{field}!={Encode(value)}");
+    public static Filter NotEqual<T>(ApiField<T> field, T value) => new($"{field}!={Encode(value)}");
 
-    public static Filter GreaterThan<T>(ApiField<T> field, T value) =>
-        new($"{field}>{Encode(value)}");
+    public static Filter GreaterThan<T>(ApiField<T> field, T value) => new($"{field}>{Encode(value)}");
 
-    public static Filter GreaterThanOrEqual<T>(ApiField<T> field, T value) =>
-        new($"{field}>={Encode(value)}");
+    public static Filter GreaterThanOrEqual<T>(ApiField<T> field, T value) => new($"{field}>={Encode(value)}");
 
-    public static Filter LessThan<T>(ApiField<T> field, T value) =>
-        new($"{field}<{Encode(value)}");
+    public static Filter LessThan<T>(ApiField<T> field, T value) => new($"{field}<{Encode(value)}");
 
-    public static Filter LessThanOrEqual<T>(ApiField<T> field, T value) =>
-        new($"{field}<={Encode(value)}");
+    public static Filter LessThanOrEqual<T>(ApiField<T> field, T value) => new($"{field}<={Encode(value)}");
 
     private static string Encode<T>(T value)
     {

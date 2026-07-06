@@ -16,7 +16,6 @@ public record SeasonCalendar(int Year, IReadOnlyList<CalendarMeeting> Meetings)
         return FindMeeting(meetingKey)?.Sessions ?? [];
     }
 
-    public IEnumerable<OpenF1Session> AllSessions() =>
-        Meetings.SelectMany(loadedMeeting => loadedMeeting.Sessions);
+    public IEnumerable<OpenF1Session> AllSessions() => Meetings.SelectMany(loadedMeeting => loadedMeeting.Sessions);
 
 }

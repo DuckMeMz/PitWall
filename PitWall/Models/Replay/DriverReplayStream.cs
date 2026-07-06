@@ -4,6 +4,8 @@ namespace PitWall.Models;
 
 public class DriverReplayStream
 {
+    private readonly DateTimeOffset[] _locationLastMovementTimestamps;
+
     public DriverNumber DriverNumber { get; }
 
     public OpenF1Location[] Locations { get; }
@@ -25,6 +27,7 @@ public class DriverReplayStream
         Locations = NormalizeSamples(
             locations.Where(location => location.X.HasValue && location.Y.HasValue),
             location => location.Timestamp);
+        _locationLastMovementTimestamps = BuildLocationLastMovementTimestamps(Locations);
         Telemetry = NormalizeSamples(telemetry, sample => sample.Timestamp);
         Intervals = NormalizeSamples(intervals, sample => sample.Timestamp);
         Positions = NormalizeSamples(positions, sample => sample.Timestamp);
@@ -44,12 +47,43 @@ public class DriverReplayStream
             .ToArray();
     }
 
+    private static DateTimeOffset[] BuildLocationLastMovementTimestamps(
+        IReadOnlyList<OpenF1Location> locations)
+    {
+        if (locations.Count == 0)
+        {
+            return [];
+        }
+
+        DateTimeOffset[] timestamps = new DateTimeOffset[locations.Count];
+        DateTimeOffset lastMovementTimestamp = locations[0].Timestamp!.Value;
+        timestamps[0] = lastMovementTimestamp;
+
+        for (int i = 1; i < locations.Count; i++)
+        {
+            OpenF1Location previous = locations[i - 1];
+            OpenF1Location current = locations[i];
+
+            if (previous.X != current.X || previous.Y != current.Y)
+            {
+                lastMovementTimestamp = current.Timestamp!.Value;
+            }
+
+            timestamps[i] = lastMovementTimestamp;
+        }
+
+        return timestamps;
+    }
+
     public DriverReplayState GetStateAt(DateTimeOffset timestamp)
     {
         return new DriverReplayState(
             DriverNumber,
             Position: SampleLatest(Positions, timestamp, position => position.Timestamp)?.Position,
-            Location: SampleInterpolatedLocation(Locations, timestamp),
+            Location: SampleInterpolatedLocation(
+                Locations,
+                _locationLastMovementTimestamps,
+                timestamp),
             Telemetry: SampleInterpolatedTelemetry(Telemetry, timestamp),
             Interval: SampleInterpolatedInterval(Intervals, timestamp),
             CurrentLap: SampleLatest(Laps, timestamp, lap => lap.TimestampStart),
@@ -57,7 +91,11 @@ public class DriverReplayStream
             CurrentPitStop: null);
     }
 
-    private static T? SampleLatest<T>(IReadOnlyList<T> samples , DateTimeOffset timestamp, Func<T, DateTimeOffset?> getTimestamp) where T : class
+    private static T? SampleLatest<T>(
+        IReadOnlyList<T> samples,
+        DateTimeOffset timestamp,
+        Func<T, DateTimeOffset?> getTimestamp)
+        where T : class
     {
         int index = FindLatestIndexAtOrBefore(samples, timestamp, getTimestamp);
 
@@ -66,8 +104,21 @@ public class DriverReplayStream
 
     private static ReplayLocation? SampleInterpolatedLocation(
         IReadOnlyList<OpenF1Location> samples,
+        IReadOnlyList<DateTimeOffset> lastMovementTimestamps,
         DateTimeOffset timestamp)
     {
+        int latestIndex = FindLatestIndexAtOrBefore(
+            samples,
+            timestamp,
+            location => location.Timestamp);
+
+        if (latestIndex < 0)
+        {
+            return null;
+        }
+
+        DateTimeOffset lastMovementTimestamp = lastMovementTimestamps[latestIndex];
+
         if (!TryGetInterpolationSamples(
             samples,
             timestamp,
@@ -77,23 +128,22 @@ public class DriverReplayStream
             out OpenF1Location? next,
             out double amount))
         {
-            OpenF1Location? latest =
-                SampleLatest(samples, timestamp, location => location.Timestamp);
+            OpenF1Location latest = samples[latestIndex];
 
-            return latest is null
-                ? null
-                : new ReplayLocation(
-                    latest.X,
-                    latest.Y,
-                    latest.Z,
-                    latest.Timestamp!.Value);
+            return new ReplayLocation(
+                latest.X,
+                latest.Y,
+                latest.Z,
+                latest.Timestamp!.Value,
+                lastMovementTimestamp);
         }
 
         return new ReplayLocation(
             Lerp(previous!.X, next!.X, amount),
             Lerp(previous.Y, next.Y, amount),
             Lerp(previous.Z, next.Z, amount),
-            previous.Timestamp!.Value);
+            previous.Timestamp!.Value,
+            lastMovementTimestamp);
     }
 
     private static ReplayTelemetry? SampleInterpolatedTelemetry(

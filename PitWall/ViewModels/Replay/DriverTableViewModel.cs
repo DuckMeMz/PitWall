@@ -7,8 +7,7 @@ namespace PitWall.ViewModels;
 
 public class DriverTableViewModel : BindableBase
 {
-    private static readonly TimeSpan RefreshInterval =
-        TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(100);
 
     private readonly Dictionary<DriverNumber, ReplayDriverRow> _rowsByDriver = new();
     private ReplayDriverRow? _selectedDriver;

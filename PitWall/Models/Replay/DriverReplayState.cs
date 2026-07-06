@@ -16,7 +16,8 @@ public readonly record struct ReplayLocation(
     int? X,
     int? Y,
     int? Z,
-    DateTimeOffset SourceTimestamp);
+    DateTimeOffset SourceTimestamp,
+    DateTimeOffset LastMovementTimestamp);
 
 public readonly record struct ReplayTelemetry(
     int? Throttle,

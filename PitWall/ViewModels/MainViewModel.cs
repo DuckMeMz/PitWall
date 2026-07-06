@@ -31,8 +31,7 @@ public class MainViewModel : BindableBase, IDisposable
 
     public MainViewModel(ReplayLoader replayLoader)
     {
-        _replayLoader =
-            replayLoader ?? throw new ArgumentNullException(nameof(replayLoader));
+        _replayLoader = replayLoader ?? throw new ArgumentNullException(nameof(replayLoader));
 
         Playback = new PlaybackViewModel();
         TrackMap = new TrackMapViewModel();
@@ -115,8 +114,7 @@ public class MainViewModel : BindableBase, IDisposable
         try
         {
             IsLoading = true;
-            StatusText =
-                $"Loading OpenF1 data for session {SessionKeyText.Trim()}...";
+            StatusText = $"Loading OpenF1 data for session {SessionKeyText.Trim()}...";
 
             ReplayLoadResult result = await _replayLoader.LoadAsync(sessionKey);
             LoadReplay(result);

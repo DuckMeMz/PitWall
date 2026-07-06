@@ -602,7 +602,7 @@
                         <DataGridTextColumn Header="Driver" Binding="{Binding DriverName}" Width="92" />
                         <DataGridTextColumn Header="Speed" Binding="{Binding Speed, TargetNullValue=-}" Width="92" />
                         <DataGridTextColumn Header="Gear" Binding="{Binding Gear, TargetNullValue=-}" Width="64" />
-                        <DataGridTextColumn Header="DRS" Binding="{Binding Drs, TargetNullValue=-}" Width="110" />
+                        <DataGridTextColumn Header="DRS" Binding="{Binding DrsText}" Width="110" />
                         <DataGridTextColumn Header="To Leader" Binding="{Binding Gap, TargetNullValue=-}" Width="90" />
                         <DataGridTextColumn Header="To Ahead" Binding="{Binding Interval}" Width="90" />
                         <DataGridTextColumn Header="Lap" Binding="{Binding Lap, TargetNullValue=-}" Width="64" />

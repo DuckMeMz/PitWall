@@ -13,14 +13,11 @@ public record ApiParams
         EndPoint = endpoint;
     }
 
-    public ApiParams WithSession(SessionKey sessionKey) =>
-        WithFilter(Filter.Equal(ApiFields.SessionKey, sessionKey));
+    public ApiParams WithSession(SessionKey sessionKey) => WithFilter(Filter.Equal(ApiFields.SessionKey, sessionKey));
 
-    public ApiParams WithMeeting(MeetingKey meetingKey) =>
-        WithFilter(Filter.Equal(ApiFields.MeetingKey, meetingKey));
+    public ApiParams WithMeeting(MeetingKey meetingKey) => WithFilter(Filter.Equal(ApiFields.MeetingKey, meetingKey));
 
-    public ApiParams WithDriver(DriverNumber driverNumber) =>
-        WithFilter(Filter.Equal(ApiFields.DriverNumber, driverNumber));
+    public ApiParams WithDriver(DriverNumber driverNumber) => WithFilter(Filter.Equal(ApiFields.DriverNumber, driverNumber));
 
 
     public ApiParams WithFilter(Filter filter)
