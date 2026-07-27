@@ -1,4 +1,5 @@
 using PitWall.ViewModels;
+using PitWall.Composition;
 using System.Windows;
 
 namespace PitWall
@@ -11,7 +12,7 @@ namespace PitWall
         {
             InitializeComponent();
 
-            _viewModel = new MainViewModel();
+            _viewModel = AppComposition.CreateMainViewModel();
             DataContext = _viewModel;
         }
 
