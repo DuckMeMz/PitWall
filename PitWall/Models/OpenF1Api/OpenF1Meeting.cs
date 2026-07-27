@@ -19,7 +19,7 @@ public record OpenF1Meeting
 
     public string? CircuitImage { get; init; }
     public string? CircuitInfo { get; init; }
-    public string? CircuitType { get; init; }
+    public CircuitType? CircuitType { get; init; }
     public string? CountryFlag { get; init; }
     public CountryKey? CountryKey { get; init; }
     public bool? IsCancelled { get; init; }
