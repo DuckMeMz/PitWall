@@ -100,11 +100,31 @@
                             Command="{Binding Playback.StopCommand}" />
                 </StackPanel>
 
-                <Slider Grid.Column="1"
+                <Grid Grid.Column="1"
+                      Height="24">
+
+                    <ProgressBar
+                          Minimum="0"
+                          Maximum="{Binding Playback.DurationSeconds}"
+                          Value="{Binding Playback.BufferedSeconds, Mode=OneWay}"
+                          Height="5"
+                          VerticalAlignment="Center"
+                          Background="#2A3444"
+                          Foreground="#788391"
+                          BorderThickness="0"
+                          Panel.ZIndex="0"
+                          d:Value="75"/>
+
+                    <Slider
                         Minimum="0"
                         Maximum="{Binding Playback.DurationSeconds}"
                         Value="{Binding Playback.CurrentTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                        VerticalAlignment="Center" />
+                        Style="{StaticResource PlaybackSliderStyle}"
+                        Panel.ZIndex="1"
+                        VerticalAlignment="Center"
+                        d:Value="2" />
+
+                </Grid>
 
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
@@ -114,21 +134,27 @@
                                Foreground="{StaticResource TextPrimaryBrush}"
                                FontWeight="SemiBold"
                                MinWidth="58"
-                               TextAlignment="Right" />
+                               TextAlignment="Right" 
+                               VerticalAlignment="Center"/>
                     <TextBlock Text=" / "
-                               Foreground="#657083" />
+                               Foreground="#657083" 
+                               VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Playback.DurationText}"
                                Foreground="{StaticResource TextMutedBrush}"
-                               MinWidth="58" />
+                               MinWidth="58"
+                               VerticalAlignment="Center"/>
                     <TextBlock Text="Speed"
                                Foreground="{StaticResource TextMutedBrush}"
-                               Margin="18,0,8,0" />
+                               Margin="18,0,8,0" 
+                               VerticalAlignment="Center"/>
                     <TextBox Width="56"
                              Height="30"
-                             Text="{Binding Playback.PlaybackSpeed, UpdateSourceTrigger=PropertyChanged}" />
+                             Text="{Binding Playback.PlaybackSpeed, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalAlignment="Center"/>
                     <TextBlock Text="x"
                                Foreground="{StaticResource TextMutedBrush}"
-                               Margin="4,0,0,0" />
+                               Margin="4,0,0,0"
+                               VerticalAlignment="Center"/>
                 </StackPanel>
             </Grid>
         </Border>

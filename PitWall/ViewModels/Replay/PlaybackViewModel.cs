@@ -14,6 +14,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
     private TimeSpan _playbackStartTime;
     private double _currentTimeSeconds;
     private double _durationSeconds;
+    private double _bufferedSeconds;
     private double _playbackSpeed = 1.0;
     private bool _isPlaying;
     private bool _isEnabled = true;
@@ -56,6 +57,17 @@ public class PlaybackViewModel : BindableBase, IDisposable
             {
                 OnPropertyChanged(nameof(DurationText));
             }
+        }
+    }
+
+    public double BufferedSeconds
+    {
+        get => _bufferedSeconds;
+        private set
+        {
+            double boundedValue = double.IsFinite(value) ? Math.Max(0, value) : 0;
+
+            SetProperty(ref _bufferedSeconds, boundedValue);
         }
     }
 
