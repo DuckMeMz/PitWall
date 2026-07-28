@@ -8,12 +8,10 @@ namespace PitWall.Services;
 public class SessionDataService
 {
     private readonly OpenF1Client _client;
-    private readonly SessionCatalogService _sessionCatalog;
 
-    public SessionDataService(OpenF1Client client, SessionCatalogService sessionCatalog)
+    public SessionDataService(OpenF1Client client)
     {
         _client = client;
-        _sessionCatalog = sessionCatalog;
     }
 
     public async Task<SessionOverview> LoadOverviewAsync(SessionKey sessionKey, CancellationToken cancellationToken = default)

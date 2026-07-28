@@ -1,0 +1,341 @@
+<UserControl
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:PitWall.Models"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d" x:Class="PitWall.SessionFinderView"
+             MinWidth="720"
+             MinHeight="480">
+
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="5*"/>
+            <ColumnDefinition Width="31*"/>
+        </Grid.ColumnDefinitions>
+        <Grid x:Name="MeetingBrowser" Grid.ColumnSpan="2">
+            <Grid.Style>
+                <Style TargetType="{x:Type Grid}">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSessionListOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="270" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="14">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Search" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" />
+                        <TextBox Height="34"
+                                 Margin="0,7,0,0"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Text="Year" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,20,0,7" />
+                        <ListBox ItemsSource="{Binding AvailableYears}"
+                                 SelectedItem="{Binding SelectedYear, Mode=TwoWay}"
+                                 IsHitTestVisible="{Binding IsYearSelectionEnabled}">
+                            <ListBox.Style>
+                                <Style TargetType="{x:Type ListBox}" BasedOn="{StaticResource FinderList}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsYearSelectionEnabled}" Value="False">
+                                            <Setter Property="Opacity" Value="0.45" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListBox.Style>
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource FinderItem}">
+                                    <Setter Property="Width" Value="72" />
+                                    <Setter Property="Padding" Value="9,7" />
+                                    <Setter Property="Margin" Value="0,0,7,7" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+
+                        <TextBlock Text="Weekend" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,16,0,7" />
+                        <CheckBox Style="{StaticResource FinderFilterToggle}"
+                                  IsChecked="{Binding ShowSprintWeekendsOnly, Mode=TwoWay}"
+                                  Content="Sprint weekends" />
+
+                        <TextBlock Text="Track Type" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,20,0,7" />
+                        <ListBox SelectedValue="{Binding CircuitTypeFilter, Mode=TwoWay}"
+                                 SelectedValuePath="Tag"
+                                 Style="{StaticResource FinderList}">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource FinderItem}">
+                                    <Setter Property="Padding" Value="10,7" />
+                                    <Setter Property="Margin" Value="0,0,0,5" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBoxItem Tag="{x:Static models:CircuitType.Unknown}" Content="All"/>
+                            <ListBoxItem Tag="{x:Static models:CircuitType.Permanent}" Content="Permanent"/>
+                            <ListBoxItem Tag="{x:Static models:CircuitType.TemporaryStreet}" Content="Temporary - Street"/>
+                            <ListBoxItem Tag="{x:Static models:CircuitType.TemporaryRoad}" Content="Temporary - Road"/>
+                        </ListBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Grand Prix weekends" Foreground="{StaticResource TextPrimaryBrush}" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding YearLoadStatusText}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding FilteredMeetings.Count, StringFormat=\{0\} meetings}"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                    <ListBox Grid.Row="2"
+                             ItemsSource="{Binding FilteredMeetings}"
+                             SelectedItem="{Binding SelectedMeeting, Mode=TwoWay}"
+                             Style="{StaticResource FinderList}" d:ItemsSource="{d:SampleData ItemCount=5}">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource FinderItem}">
+                                <Setter Property="Padding" Value="14,12" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding MeetingName}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <TextBlock Text="{Binding CircuitShortName}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
+                                            <TextBlock Text=" · " Foreground="#526277" FontSize="12" />
+                                            <TextBlock Text="{Binding CircuitTypeDisplayName}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
+                                            <TextBlock Text=" · " Foreground="#526277" FontSize="12" />
+                                            <TextBlock Text="{Binding Sessions.Count, StringFormat=\{0\} sessions}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
+                                            <Border Background="#204534" CornerRadius="8" Padding="6,2" Margin="9,-1,0,0">
+                                                <Border.Style>
+                                                    <Style TargetType="{x:Type Border}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSprintWeekend}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="SPRINT" Foreground="#48D58B" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <Border Grid.RowSpan="3"
+                            Panel.ZIndex="1"
+                            Background="#D9121823">
+                        <Border.Style>
+                            <Style TargetType="{x:Type Border}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsLoadingYear}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="260">
+                            <TextBlock Text="Loading calendar"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       TextAlignment="Center" />
+                            <ProgressBar IsIndeterminate="True"
+                                         Height="6"
+                                         Margin="0,12,0,10"
+                                         Foreground="{StaticResource AccentBrush}" />
+                            <TextBlock Text="{Binding YearLoadStatusText}"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       FontSize="12"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Grid x:Name="SessionBrowser" Grid.ColumnSpan="2">
+            <Grid.Style>
+                <Style TargetType="{x:Type Grid}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSessionListOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="16" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Content="← Back" Height="32" VerticalAlignment="Center" Command="{Binding BackToMeetingsCommand}" />
+                    <StackPanel Grid.Column="1" Margin="14,0,0,0">
+                        <TextBlock Text="{Binding SelectedMeeting.MeetingName}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="18" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding SelectedMeeting.CircuitShortName}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,2,0,0" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding SelectedMeeting.Year}" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="Practice" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,7" />
+                    <ListBox ItemsSource="{Binding SelectedMeeting.PracticeSessions}" SelectedItem="{Binding SelectedSession, Mode=TwoWay}" Style="{StaticResource FinderList}" ItemTemplate="{StaticResource SessionCard}">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="3" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource FinderItem}">
+                                <Setter Property="Margin" Value="0,0,10,0" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+
+                    <Border Margin="0,16,0,0">
+                        <Border.Style>
+                            <Style TargetType="{x:Type Border}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedMeeting.IsSprintWeekend}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <ListBox ItemsSource="{Binding SelectedMeeting.SprintSessions}" SelectedItem="{Binding SelectedSession, Mode=TwoWay}" Style="{StaticResource FinderList}" ItemTemplate="{StaticResource SessionCard}">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="2" />
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource FinderItem}">
+                                        <Setter Property="Margin" Value="0,0,10,0" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="{x:Type StackPanel}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedMeeting.IsSprintWeekend}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="Qualifying" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,16,0,7" />
+                        <ListBox ItemsSource="{Binding SelectedMeeting.QualifyingSessions}" SelectedItem="{Binding SelectedSession, Mode=TwoWay}" Style="{StaticResource FinderList}" ItemTemplate="{StaticResource SessionCard}">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource FinderItem}">
+                                    <Setter Property="Margin" Value="0" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                        <TextBlock Text="Race" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,16,0,7" />
+                        <ListBox ItemsSource="{Binding SelectedMeeting.RaceSessions}" SelectedItem="{Binding SelectedSession, Mode=TwoWay}" Style="{StaticResource FinderList}" ItemTemplate="{StaticResource SessionCard}">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource FinderItem}">
+                                    <Setter Property="Margin" Value="0" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </StackPanel>
+
+                    <Grid Margin="0,16,0,0">
+                        <Grid.Style>
+                            <Style TargetType="{x:Type Grid}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedMeeting.IsSprintWeekend}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Qualifying" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,7" />
+                            <ListBox ItemsSource="{Binding SelectedMeeting.QualifyingSessions}" SelectedItem="{Binding SelectedSession, Mode=TwoWay}" Style="{StaticResource FinderList}" ItemTemplate="{StaticResource SessionCard}">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource FinderItem}">
+                                        <Setter Property="Margin" Value="0,0,0,12" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Race" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,7" />
+                            <ListBox ItemsSource="{Binding SelectedMeeting.RaceSessions}" SelectedItem="{Binding SelectedSession, Mode=TwoWay}" Style="{StaticResource FinderList}" ItemTemplate="{StaticResource SessionCard}">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource FinderItem}">
+                                        <Setter Property="Margin" Value="0,0,0,12" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

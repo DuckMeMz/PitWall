@@ -4,11 +4,11 @@ using System.Net.Http;
 
 namespace PitWall.Composition;
 
-public class AppComposition
+public static class AppComposition
 {
     private static readonly HttpClient HttpClient = new();
 
-    public MainViewModel CreateMainViewModel()
+    public static MainViewModel CreateMainViewModel()
     {
         OpenF1APIService apiService = new(HttpClient);
         OpenF1Client openF1Client = new(apiService);

@@ -15,21 +15,10 @@ public class MainViewModel : BindableBase, IDisposable
     private string _sessionKeyText = "latest";
     private string _statusText = "Enter a session key and load replay data.";
     private bool _isLoading;
+    private bool _isSessionFinderOpen;
     private bool _isDisposed;
 
-    public MainViewModel()
-        : this(CreateDefaultSessionDataService(), new ReplayBuilder())
-    {
-    }
-
-    public MainViewModel(
-        SessionDataService sessionDataService,
-        ReplayBuilder replayBuilder)
-        : this(new ReplayLoader(sessionDataService, replayBuilder))
-    {
-    }
-
-    public MainViewModel(ReplayLoader replayLoader)
+    public MainViewModel(ReplayLoader replayLoader, SessionFinderViewModel sessionFinderViewModel)
     {
         _replayLoader = replayLoader ?? throw new ArgumentNullException(nameof(replayLoader));
 
@@ -37,21 +26,40 @@ public class MainViewModel : BindableBase, IDisposable
         TrackMap = new TrackMapViewModel();
         DriverTable = new DriverTableViewModel();
         Telemetry = new TelemetryViewModel();
+        SessionFinder = sessionFinderViewModel ?? throw new ArgumentNullException(nameof(sessionFinderViewModel));
 
         Playback.PositionChanged += OnPlaybackPositionChanged;
+        SessionFinder.SessionSelected += OnSessionSelected;
         DriverTable.SelectedDriverChanged += OnSelectedDriverChanged;
 
         LoadReplayCommand = new AsyncRelayCommand(
             LoadReplayAsync,
             () => !IsLoading);
+
+        OpenSessionFinderCommand = new RelayCommand(() => IsSessionFinderOpen = true);
+        CloseSessionFinderCommand = new RelayCommand(() => IsSessionFinderOpen = false);
+    }
+
+    public async Task InitialiseAsync()
+    {
+        await SessionFinder.InitialiseAsync();
     }
 
     public ICommand LoadReplayCommand { get; }
+    public ICommand OpenSessionFinderCommand { get; }
+    public ICommand CloseSessionFinderCommand { get; }
 
     public PlaybackViewModel Playback { get; }
     public TrackMapViewModel TrackMap { get; }
     public DriverTableViewModel DriverTable { get; }
     public TelemetryViewModel Telemetry { get; }
+    public SessionFinderViewModel SessionFinder { get; }
+
+    public bool IsSessionFinderOpen
+    {
+        get => _isSessionFinderOpen;
+        set => SetProperty(ref _isSessionFinderOpen, value);
+    }
 
     public string SessionKeyText
     {
@@ -94,6 +102,7 @@ public class MainViewModel : BindableBase, IDisposable
         _isDisposed = true;
         Playback.PositionChanged -= OnPlaybackPositionChanged;
         DriverTable.SelectedDriverChanged -= OnSelectedDriverChanged;
+        SessionFinder.SessionSelected -= OnSessionSelected;
         Playback.Dispose();
         Telemetry.Dispose();
     }
@@ -109,12 +118,22 @@ public class MainViewModel : BindableBase, IDisposable
             return;
         }
 
+        await LoadReplayAsync(sessionKey, SessionKeyText.Trim());
+    }
+
+    private async Task LoadReplayAsync(SessionKey sessionKey, string sessionDescription)
+    {
+        if (IsLoading)
+        {
+            return;
+        }
+
         ClearReplay();
 
         try
         {
             IsLoading = true;
-            StatusText = $"Loading OpenF1 data for session {SessionKeyText.Trim()}...";
+            StatusText = $"Loading OpenF1 data for {sessionDescription}...";
 
             ReplayLoadResult result = await _replayLoader.LoadAsync(sessionKey);
             LoadReplay(result);
@@ -130,6 +149,12 @@ public class MainViewModel : BindableBase, IDisposable
         }
     }
 
+    private void OnSessionSelected(SessionFinderSession session)
+    {
+        SessionKeyText = session.SessionKey.Value.ToString();
+        IsSessionFinderOpen = false;
+        _ = LoadReplayAsync(session.SessionKey, session.SessionName);
+    }
     private void LoadReplay(ReplayLoadResult result)
     {
         _timeline = result.Timeline;
@@ -221,15 +246,5 @@ public class MainViewModel : BindableBase, IDisposable
         sessionKey = default;
         errorMessage = "Session key must be an integer or latest.";
         return false;
-    }
-
-    private static SessionDataService CreateDefaultSessionDataService()
-    {
-        HttpClient httpClient = new();
-        OpenF1APIService apiService = new(httpClient);
-        OpenF1Client client = new(apiService);
-        SessionCatalogService sessionCatalog = new(client);
-
-        return new SessionDataService(client, sessionCatalog);
     }
 }

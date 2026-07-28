@@ -19,8 +19,15 @@ public record CalendarMeeting(OpenF1Meeting Meeting, IReadOnlyList<OpenF1Session
 
     public IEnumerable<OpenF1Session> GetQualifyingSessions() =>
         Sessions.Where(session => session.SessionType == SessionType.Qualifying || session.SessionType == SessionType.SprintQualifying);
-    public bool IsSprintWeekend() =>
-        Sessions.FirstOrDefault(session => session.SessionType == SessionType.Sprint  || session.SessionType == SessionType.SprintQualifying) is not null;
+
+    public bool IsSprintWeekend() => Sessions.Any(IsSprintSession);
+
+    private static bool IsSprintSession(OpenF1Session session)
+    {
+        return session.SessionType == SessionType.Sprint
+            || session.SessionType == SessionType.SprintQualifying
+            || session.SessionName?.Contains("sprint", StringComparison.OrdinalIgnoreCase) == true;
+    }
 
 
 }

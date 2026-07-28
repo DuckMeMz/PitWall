@@ -6,6 +6,7 @@ using PitWall.Services.Exceptions;
 using System.Text.Json;
 using PitWall.Configuration;
 using System.Net;
+using System.Threading.RateLimiting;
 
 namespace PitWall.Services;
 
@@ -18,25 +19,26 @@ public class OpenF1APIService
     public OpenF1APIService(HttpClient httpClient)
     {
         _httpClient = httpClient;
-        
+
         _pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
-            .AddRateLimiter(new System.Threading.RateLimiting.FixedWindowRateLimiter(
-                new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 1,
-                    Window = TimeSpan.FromSeconds(1),
-                    QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
-                    QueueLimit = 1000
-                }))
-            .AddRetry(new Polly.Retry.RetryStrategyOptions<HttpResponseMessage>
-            {
-                ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
-                    .HandleResult(response => response.StatusCode == System.Net.HttpStatusCode.TooManyRequests),
-                MaxRetryAttempts = 5,
-                Delay = TimeSpan.FromSeconds(1),
-                BackoffType = DelayBackoffType.Exponential
-            })
-            .Build();
+        .AddRetry(new Polly.Retry.RetryStrategyOptions<HttpResponseMessage>
+        {
+            ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
+                .HandleResult(response =>
+                    response.StatusCode == HttpStatusCode.TooManyRequests),
+            MaxRetryAttempts = 5,
+            Delay = TimeSpan.FromSeconds(1),
+            BackoffType = DelayBackoffType.Exponential
+        })
+        .AddRateLimiter(CreateRateLimiter(
+            permitLimit: 30,
+            window: TimeSpan.FromMinutes(1),
+            segmentsPerWindow: 60))
+        .AddRateLimiter(CreateRateLimiter(
+            permitLimit: 3,
+            window: TimeSpan.FromSeconds(1),
+            segmentsPerWindow: 10))
+        .Build();
     }
 
     public async Task<IReadOnlyList<T>> FetchDataAsync<T>(ApiParams parameters, CancellationToken cancellationToken = default)
@@ -51,6 +53,8 @@ public class OpenF1APIService
 
         string json = await response.Content.ReadAsStringAsync(cancellationToken);
 
+        Debug.WriteLine($"Fetched: {finalUrl}.");
+
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             Debug.WriteLine($"OpenF1 returned no data for {finalUrl}.");
@@ -64,6 +68,7 @@ public class OpenF1APIService
 
         if (response.StatusCode == HttpStatusCode.NoContent || string.IsNullOrWhiteSpace(json))
         {
+            Debug.WriteLine($"OpenF1 returned no content for {finalUrl}");
             return [];
         }
 
@@ -75,5 +80,19 @@ public class OpenF1APIService
         {
             throw new OpenF1DeserializeException(finalUrl, typeof(T), jsonException);
         }
+    }
+
+    private static SlidingWindowRateLimiter CreateRateLimiter(int permitLimit, TimeSpan window, int segmentsPerWindow)
+    {
+        return new SlidingWindowRateLimiter(
+            new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = permitLimit,
+                Window = window,
+                SegmentsPerWindow = segmentsPerWindow,
+                AutoReplenishment = true,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 100
+            });
     }
 }

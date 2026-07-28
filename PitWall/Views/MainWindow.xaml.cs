@@ -14,6 +14,13 @@ namespace PitWall
 
             _viewModel = AppComposition.CreateMainViewModel();
             DataContext = _viewModel;
+
+            Loaded += OnLoaded;
+        }
+
+        private async void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            await _viewModel.InitialiseAsync();
         }
 
         protected override void OnClosed(EventArgs e)

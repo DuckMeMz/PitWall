@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:services="clr-namespace:PitWall.Services"
+        xmlns:views="clr-namespace:PitWall"
         mc:Ignorable="d"
         Title="PitWall Replay"
         Height="760"
@@ -13,208 +14,7 @@
         FontFamily="Segoe UI"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType">
-    <Window.Resources>
-        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0B0F16" />
-        <SolidColorBrush x:Key="PanelBrush" Color="#121823" />
-        <SolidColorBrush x:Key="PanelAltBrush" Color="#161D29" />
-        <SolidColorBrush x:Key="PanelRaisedBrush" Color="#1B2330" />
-        <SolidColorBrush x:Key="BorderBrushSoft" Color="#273142" />
-        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F4F7FB" />
-        <SolidColorBrush x:Key="TextMutedBrush" Color="#9AA6B7" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#2F9BFF" />
-        <SolidColorBrush x:Key="AccentHoverBrush" Color="#4DABFF" />
-        <SolidColorBrush x:Key="SuccessBrush" Color="#35D07F" />
-        <SolidColorBrush x:Key="DangerBrush" Color="#FF5A5F" />
-        <SolidColorBrush x:Key="WarningBrush" Color="#F9C74F" />
 
-        <Style TargetType="{x:Type Button}">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="Background" Value="{StaticResource PanelRaisedBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="14,7" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type Button}">
-                        <Border x:Name="ButtonBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#243044" />
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#3B4960" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#1B2536" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style TargetType="{x:Type TextBox}">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="Background" Value="#0E141F" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,0" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type TextBox}">
-                        <Border x:Name="TextBoxBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="5">
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="SliderRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type RepeatButton}">
-                        <Border Height="4"
-                                VerticalAlignment="Center"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="2" />
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style TargetType="{x:Type Thumb}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type Thumb}">
-                        <Ellipse Width="15"
-                                 Height="15"
-                                 Fill="{StaticResource TextPrimaryBrush}"
-                                 Stroke="{StaticResource AccentBrush}"
-                                 StrokeThickness="2" />
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style TargetType="{x:Type Slider}">
-            <Setter Property="Height" Value="24" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type Slider}">
-                        <Grid>
-                            <Track x:Name="PART_Track">
-                                <Track.DecreaseRepeatButton>
-                                    <RepeatButton Command="Slider.DecreaseLarge"
-                                                  Background="{StaticResource AccentBrush}"
-                                                  Style="{StaticResource SliderRepeatButtonStyle}" />
-                                </Track.DecreaseRepeatButton>
-                                <Track.IncreaseRepeatButton>
-                                    <RepeatButton Command="Slider.IncreaseLarge"
-                                                  Background="#2A3444"
-                                                  Style="{StaticResource SliderRepeatButtonStyle}" />
-                                </Track.IncreaseRepeatButton>
-                                <Track.Thumb>
-                                    <Thumb />
-                                </Track.Thumb>
-                            </Track>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style TargetType="{x:Type ProgressBar}">
-            <Setter Property="Height" Value="8" />
-            <Setter Property="Background" Value="#2A3444" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ProgressBar}">
-                        <Grid ClipToBounds="True">
-                            <Border x:Name="PART_Track"
-                                    Background="{TemplateBinding Background}"
-                                    CornerRadius="4" />
-                            <Border x:Name="PART_Indicator"
-                                    HorizontalAlignment="Left"
-                                    Background="{TemplateBinding Foreground}"
-                                    CornerRadius="4" />
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style TargetType="{x:Type DataGrid}">
-            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="RowBackground" Value="{StaticResource PanelBrush}" />
-            <Setter Property="AlternatingRowBackground" Value="#151D29" />
-            <Setter Property="HorizontalGridLinesBrush" Value="#273142" />
-            <Setter Property="VerticalGridLinesBrush" Value="#202838" />
-            <Setter Property="HeadersVisibility" Value="Column" />
-            <Setter Property="GridLinesVisibility" Value="Horizontal" />
-            <Setter Property="ColumnHeaderHeight" Value="32" />
-            <Setter Property="RowHeight" Value="28" />
-            <Setter Property="FontSize" Value="12" />
-        </Style>
-
-        <Style TargetType="{x:Type DataGridColumnHeader}">
-            <Setter Property="Background" Value="#202A39" />
-            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
-            <Setter Property="BorderBrush" Value="#2E394B" />
-            <Setter Property="BorderThickness" Value="0,0,1,1" />
-            <Setter Property="Padding" Value="8,0" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-
-        <Style TargetType="{x:Type DataGridCell}">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="8,0" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type DataGridCell}">
-                        <Border Background="{TemplateBinding Background}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter VerticalAlignment="Center" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#174B72" />
-                    <Setter Property="Foreground" Value="White" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-    </Window.Resources>
 
     <Grid Background="{StaticResource AppBackgroundBrush}">
         <Grid.RowDefinitions>
@@ -264,6 +64,10 @@
                             Background="{StaticResource AccentBrush}"
                             BorderBrush="{StaticResource AccentBrush}"
                             Command="{Binding LoadReplayCommand}" />
+                    <Button Content="Find session"
+                            Height="32"
+                            Margin="8,0,0,0"
+                            Command="{Binding OpenSessionFinderCommand}" />
                 </StackPanel>
             </Border>
         </Grid>
@@ -622,6 +426,61 @@
                        Foreground="{StaticResource TextMutedBrush}"
                        FontSize="12"
                        TextWrapping="Wrap" />
+        </Border>
+
+        <Border Grid.RowSpan="4"
+                Panel.ZIndex="10"
+                Background="#B30B0F16">
+            <Border.Style>
+                <Style TargetType="{x:Type Border}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSessionFinderOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border Width="1040"
+                        Height="640"
+                        Background="{StaticResource AppBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="20">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="16" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Session Finder"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontSize="24"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="Browse Formula 1 weekends, then choose a session to replay."
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="12"
+                                           Margin="0,3,0,0" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Content="Back to replay"
+                                    Height="32"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding CloseSessionFinderCommand}" />
+                        </Grid>
+                        <views:SessionFinderView Grid.Row="2"
+                                                 DataContext="{Binding SessionFinder}" />
+                    </Grid>
+                </Border>
+            </Grid>
         </Border>
     </Grid>
 </Window>
