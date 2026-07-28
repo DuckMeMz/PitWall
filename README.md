@@ -4,6 +4,8 @@
 ![WPF](https://img.shields.io/badge/UI-WPF-0C54C2)
 ![Status](https://img.shields.io/badge/Status-Work%20In%20Progress-F59E0B)
 
+> ⚠️ **Known issue:** OpenF1 has just update the API so races are being rejected due to rejecting large data requests. I’m currently working on buffered loading to resolve this.
+
 PitWall is a work-in-progress Windows desktop application that turns [OpenF1](https://openf1.org/docs/) session data into an interactive Formula 1 replay.
 
 Load a session, move through its timeline, follow the cars on the circuit map, and inspect timing and telemetry for each driver.
