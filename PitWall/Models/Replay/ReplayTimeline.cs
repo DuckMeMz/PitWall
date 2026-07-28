@@ -6,6 +6,7 @@ public record ReplayTimeline
 {
     public DateTimeOffset SessionStart { get; init; }
     public TimeSpan Duration { get; init; }
+    public TimeSpan BufferedDuration { get; init; }
     public OpenF1Driver[] Drivers { get; init; }
     public DriverReplayStream[] DriverStreams { get; init; }
     public int DriverCount => Drivers.Length;
