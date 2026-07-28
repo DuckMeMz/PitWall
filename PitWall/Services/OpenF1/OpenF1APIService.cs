@@ -53,8 +53,6 @@ public class OpenF1APIService
 
         string json = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        Debug.WriteLine($"Fetched: {finalUrl}.");
-
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             Debug.WriteLine($"OpenF1 returned no data for {finalUrl}.");
