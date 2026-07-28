@@ -14,7 +14,7 @@ public record OpenF1Location
 
 public static class LocationFields
 {
-    public static readonly ApiField<DateTimeOffset?> TimestampStart = new("date");
+    public static readonly ApiField<DateTimeOffset?> Timestamp = new("date");
     public static readonly ApiField<MeetingKey> MeetingKey = ApiFields.MeetingKey;
     public static readonly ApiField<SessionKey> SessionKey = ApiFields.SessionKey;
     public static readonly ApiField<DriverNumber> DriverNumber = ApiFields.DriverNumber;
