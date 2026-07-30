@@ -14,7 +14,6 @@ public class PlaybackViewModel : BindableBase, IDisposable
     private TimeSpan _playbackStartTime;
     private double _currentTimeSeconds;
     private double _durationSeconds;
-    private double _bufferedSeconds;
     private double _playbackSpeed = 1.0;
     private bool _isPlaying;
     private bool _isEnabled = true;
@@ -60,17 +59,6 @@ public class PlaybackViewModel : BindableBase, IDisposable
         }
     }
 
-    public double BufferedSeconds
-    {
-        get => _bufferedSeconds;
-        private set
-        {
-            double boundedValue = double.IsFinite(value) ? Math.Max(0, value) : 0;
-
-            SetProperty(ref _bufferedSeconds, boundedValue);
-        }
-    }
-
     public double PlaybackSpeed
     {
         get => _playbackSpeed;
@@ -81,6 +69,10 @@ public class PlaybackViewModel : BindableBase, IDisposable
             SetProperty(ref _playbackSpeed, boundedValue);
         }
     }
+
+    public TimeSpan BufferedDuration => _timeline?.BufferedDuration ?? TimeSpan.Zero;
+
+    public double BufferedSeconds => BufferedDuration.TotalSeconds;
 
     public bool IsPlaying
     {
@@ -122,6 +114,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
         Pause();
         _timeline = timeline;
         DurationSeconds = timeline.Duration.TotalSeconds;
+        RefreshBufferedDuration();
         OnPropertyChanged(nameof(FrameText));
         ApplyPosition(TimeSpan.Zero, forceNotification: true);
     }
@@ -132,7 +125,14 @@ public class PlaybackViewModel : BindableBase, IDisposable
         _timeline = null;
         DurationSeconds = 0;
         SetCurrentTimeSeconds(0);
+        RefreshBufferedDuration();
         OnPropertyChanged(nameof(FrameText));
+    }
+
+    public void RefreshBufferedDuration()
+    {
+        OnPropertyChanged(nameof(BufferedDuration));
+        OnPropertyChanged(nameof(BufferedSeconds));
     }
 
     public void Stop()
@@ -212,11 +212,11 @@ public class PlaybackViewModel : BindableBase, IDisposable
     {
         TimeSpan scaledElapsed = TimeSpan.FromTicks((long)(_playbackClock.Elapsed.Ticks * PlaybackSpeed));
         TimeSpan targetTime = _playbackStartTime + scaledElapsed;
-        TimeSpan duration = TimeSpan.FromSeconds(DurationSeconds);
+        TimeSpan bufferedDuration = _timeline?.BufferedDuration ?? TimeSpan.Zero;
 
-        if (targetTime >= duration)
+        if (targetTime >= bufferedDuration)
         {
-            SeekTo(duration, resetPlaybackClock: false);
+            SeekTo(bufferedDuration, resetPlaybackClock: false);
             Pause();
             return;
         }

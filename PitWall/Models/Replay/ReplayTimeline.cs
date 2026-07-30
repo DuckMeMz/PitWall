@@ -1,4 +1,5 @@
 ﻿using PitWall.Models.OpenF1Api;
+using System.Xaml.Schema;
 
 namespace PitWall.Models;
 
@@ -11,6 +12,8 @@ public record ReplayTimeline
     public OpenF1Driver[] Drivers { get; init; }
     public DriverReplayStream[] DriverStreams { get; init; }
     public int DriverCount => Drivers.Length;
+
+    public IEnumerable<OpenF1Location> AllLocations => DriverStreams.SelectMany(stream => stream.Locations);
 
     public ReplayTimeline(
         SessionKey sessionKey,
