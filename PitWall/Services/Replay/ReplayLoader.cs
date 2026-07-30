@@ -19,16 +19,16 @@ public class ReplayLoader
     public async Task<ReplayLoadResult> LoadAsync(SessionKey sessionKey, CancellationToken cancellationToken = default)
     {
         Stopwatch loadTimer = Stopwatch.StartNew();
-        ReplayData replayData =
-            await _sessionDataService.LoadReplayDataAsync(sessionKey, cancellationToken);
+        InitialReplayData initalReplayData =
+            await _sessionDataService.LoadInitalReplayChunk(sessionKey, TimeSpan.FromMinutes(1), cancellationToken);
 
         Stopwatch buildTimer = Stopwatch.StartNew();
-        ReplayTimeline timeline = _replayBuilder.BuildReplay(replayData);
+        ReplayTimeline timeline = _replayBuilder.BuildInitialTimeline(initalReplayData);
         buildTimer.Stop();
         loadTimer.Stop();
 
         return new ReplayLoadResult(
-            replayData,
+            initalReplayData,
             timeline,
             loadTimer.Elapsed,
             buildTimer.Elapsed);
@@ -36,7 +36,7 @@ public class ReplayLoader
 }
 
 public record ReplayLoadResult(
-    ReplayData Data,
+    InitialReplayData Data,
     ReplayTimeline Timeline,
     TimeSpan TotalElapsed,
     TimeSpan BuildElapsed);

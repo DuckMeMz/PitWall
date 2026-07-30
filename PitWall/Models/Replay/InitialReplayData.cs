@@ -8,14 +8,14 @@ public record ReplayDataChunk(
     IReadOnlyList<OpenF1PositionUpdate> Positions,
     IReadOnlyList<OpenF1CarTelemetrySample> CarTelemetry,
     IReadOnlyList<OpenF1IntervalSample> Intervals,
-    DateTimeOffset chunkTimestampStart,
-    TimeSpan chunkLength,
+    DateTimeOffset ChunkTimestampStart,
+    TimeSpan ChunkLength,
     OpenF1Meeting? Meeting = null)
 {
 
 }
 
-public record ReplayData(
+public record InitialReplayData(
     OpenF1Session Session, //Non-Buffered
     IReadOnlyList<OpenF1Driver> Drivers, //Non-Buffered
     IReadOnlyList<OpenF1Location> Locations, //Buffered 
@@ -23,8 +23,7 @@ public record ReplayData(
     IReadOnlyList<OpenF1CarTelemetrySample> CarTelemetry, //Buffered
     IReadOnlyList<OpenF1IntervalSample> Intervals, //Buffered
     IReadOnlyList<OpenF1Lap> Laps, //Non-Buffered
-    TimeSpan loadedLength,
+    TimeSpan LoadedLength,
     OpenF1Meeting? Meeting = null)
 {
-
 }

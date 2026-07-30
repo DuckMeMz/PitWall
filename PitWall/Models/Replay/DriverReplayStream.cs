@@ -4,37 +4,103 @@ namespace PitWall.Models;
 
 public class DriverReplayStream
 {
-    private readonly DateTimeOffset[] _locationLastMovementTimestamps;
+    private DateTimeOffset[] _locationLastMovementTimestamps;
 
     public DriverNumber DriverNumber { get; }
 
-    public OpenF1Location[] Locations { get; }
-    public OpenF1CarTelemetrySample[] Telemetry { get; }
-    public OpenF1IntervalSample[] Intervals { get; }
-    public OpenF1PositionUpdate[] Positions { get; }
-    public OpenF1Lap[] Laps { get; }
+    public List<OpenF1Location> Locations { get; }
+    public List<OpenF1CarTelemetrySample> Telemetry { get; }
+    public List<OpenF1IntervalSample> Intervals { get; }
+    public List<OpenF1PositionUpdate> Positions { get; }
+    public List<OpenF1Lap> Laps { get; }
 
     public DriverReplayStream(
         DriverNumber driverNumber,
-        OpenF1Location[] locations,
-        OpenF1CarTelemetrySample[] telemetry,
-        OpenF1IntervalSample[] intervals,
-        OpenF1PositionUpdate[] positions,
-        OpenF1Lap[] laps)
+        List<OpenF1Location> locations,
+        List<OpenF1CarTelemetrySample> telemetry,
+        List<OpenF1IntervalSample> intervals,
+        List<OpenF1PositionUpdate> positions,
+        List<OpenF1Lap> laps)
     {
         DriverNumber = driverNumber;
 
-        Locations = NormalizeSamples(
+        Locations = NormalizeSamplesIntoList(
             locations.Where(location => location.X.HasValue && location.Y.HasValue),
             location => location.Timestamp);
         _locationLastMovementTimestamps = BuildLocationLastMovementTimestamps(Locations);
-        Telemetry = NormalizeSamples(telemetry, sample => sample.Timestamp);
-        Intervals = NormalizeSamples(intervals, sample => sample.Timestamp);
-        Positions = NormalizeSamples(positions, sample => sample.Timestamp);
-        Laps = NormalizeSamples(laps, lap => lap.TimestampStart);
+        Telemetry = NormalizeSamplesIntoList(telemetry, sample => sample.Timestamp);
+        Intervals = NormalizeSamplesIntoList(intervals, sample => sample.Timestamp);
+        Positions = NormalizeSamplesIntoList(positions, sample => sample.Timestamp);
+        Laps = NormalizeSamplesIntoList(laps, lap => lap.TimestampStart);
     }
 
-    private static T[] NormalizeSamples<T>(
+    public void AppendStream(
+        IEnumerable<OpenF1Location> newLocations,
+        IEnumerable<OpenF1CarTelemetrySample> newCarTelemetry,
+        IEnumerable<OpenF1IntervalSample> newIntervals,
+        IEnumerable<OpenF1PositionUpdate> newPositions)
+    {
+        ArgumentNullException.ThrowIfNull(newLocations);
+        ArgumentNullException.ThrowIfNull(newCarTelemetry);
+        ArgumentNullException.ThrowIfNull(newIntervals);
+        ArgumentNullException.ThrowIfNull(newPositions);
+
+        int firstChangedLocationIndex = AppendSamples(
+            Locations,
+            newLocations.Where(location => location.X.HasValue && location.Y.HasValue),
+            location => location.Timestamp);
+
+        AppendSamples(Telemetry, newCarTelemetry, sample => sample.Timestamp);
+        AppendSamples(Intervals, newIntervals, sample => sample.Timestamp);
+        AppendSamples(Positions, newPositions, sample => sample.Timestamp);
+
+        if (firstChangedLocationIndex < Locations.Count)
+        {
+            UpdateLocationLastMovementTimestamps(firstChangedLocationIndex);
+        }
+    }
+
+    private static int AppendSamples<T>(
+        List<T> existingSamples,
+        IEnumerable<T> newSamples,
+        Func<T, DateTimeOffset?> getTimestamp)
+        where T : class
+    {
+        List<T> orderedNewSamples = NormalizeSamplesIntoList(newSamples, getTimestamp);
+
+        if (orderedNewSamples.Count == 0)
+        {
+            return existingSamples.Count;
+        }
+
+        if (existingSamples.Count == 0)
+        {
+            existingSamples.AddRange(orderedNewSamples);
+            return 0;
+        }
+
+        DateTimeOffset existingEnd = getTimestamp(existingSamples[^1])!.Value;
+        DateTimeOffset newStart = getTimestamp(orderedNewSamples[0])!.Value;
+
+        if (newStart < existingEnd)
+        {
+            throw new InvalidOperationException("Cannot append samples that start before the current stream data ends.");
+        }
+
+        int firstChangedIndex = existingSamples.Count;
+        int firstNewIndex = 0;
+
+        if (newStart == existingEnd)
+        {
+            existingSamples[^1] = orderedNewSamples[0];
+            firstChangedIndex--;
+            firstNewIndex = 1;
+        }
+
+        existingSamples.AddRange(orderedNewSamples.Skip(firstNewIndex));
+        return firstChangedIndex;
+    }
+    private static List<T> NormalizeSamplesIntoList<T>(
         IEnumerable<T> samples,
         Func<T, DateTimeOffset?> getTimestamp)
         where T : class
@@ -44,7 +110,7 @@ public class DriverReplayStream
             .OrderBy(sample => getTimestamp(sample)!.Value)
             .GroupBy(sample => getTimestamp(sample)!.Value)
             .Select(group => group.Last())
-            .ToArray();
+            .ToList();
     }
 
     private static DateTimeOffset[] BuildLocationLastMovementTimestamps(
@@ -75,6 +141,36 @@ public class DriverReplayStream
         return timestamps;
     }
 
+    private void UpdateLocationLastMovementTimestamps(int firstChangedIndex)
+    {
+        Array.Resize(ref _locationLastMovementTimestamps, Locations.Count);
+
+        DateTimeOffset lastMovementTimestamp;
+
+        if (firstChangedIndex == 0)
+        {
+            lastMovementTimestamp = Locations[0].Timestamp!.Value;
+            _locationLastMovementTimestamps[0] = lastMovementTimestamp;
+            firstChangedIndex = 1;
+        }
+        else
+        {
+            lastMovementTimestamp = _locationLastMovementTimestamps[firstChangedIndex - 1];
+        }
+
+        for (int i = firstChangedIndex; i < Locations.Count; i++)
+        {
+            OpenF1Location previous = Locations[i - 1];
+            OpenF1Location current = Locations[i];
+
+            if (previous.X != current.X || previous.Y != current.Y)
+            {
+                lastMovementTimestamp = current.Timestamp!.Value;
+            }
+
+            _locationLastMovementTimestamps[i] = lastMovementTimestamp;
+        }
+    }
     public DriverReplayState GetStateAt(DateTimeOffset timestamp)
     {
         return new DriverReplayState(

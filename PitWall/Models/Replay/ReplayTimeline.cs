@@ -4,16 +4,19 @@ namespace PitWall.Models;
 
 public record ReplayTimeline
 {
+    public SessionKey SessionKey { get; init; }
     public DateTimeOffset SessionStart { get; init; }
     public TimeSpan Duration { get; init; }
-    public TimeSpan BufferedDuration { get; init; }
+    public TimeSpan BufferedDuration { get; private set; }
     public OpenF1Driver[] Drivers { get; init; }
     public DriverReplayStream[] DriverStreams { get; init; }
     public int DriverCount => Drivers.Length;
 
     public ReplayTimeline(
+        SessionKey sessionKey,
         DateTimeOffset sessionStart,
         TimeSpan duration,
+        TimeSpan bufferedDuration,
         OpenF1Driver[] drivers,
         DriverReplayStream[] driverStreams)
     {
@@ -24,10 +27,27 @@ public record ReplayTimeline
                 $"Drivers: {drivers.Length}, streams: {driverStreams.Length}.");
         }
 
+        if (bufferedDuration < TimeSpan.Zero || bufferedDuration > duration)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bufferedDuration), "Buffered duration must be within the replay duration.");
+        }
+
+        SessionKey = sessionKey;
         SessionStart = sessionStart;
         Duration = duration;
+        BufferedDuration = bufferedDuration;
         Drivers = drivers;
         DriverStreams = driverStreams;
+    }
+
+    public void UpdateBufferedDuration(TimeSpan bufferedDuration)
+    {
+        if (bufferedDuration < TimeSpan.Zero || bufferedDuration > Duration)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bufferedDuration), "Buffered duration must be within the replay duration.");
+        }
+
+        BufferedDuration = bufferedDuration;
     }
 
 
