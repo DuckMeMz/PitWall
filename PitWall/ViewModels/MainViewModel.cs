@@ -36,6 +36,10 @@ public class MainViewModel : BindableBase, IDisposable
             LoadReplayAsync,
             () => !IsLoading);
 
+        BufferNextMinuteCommand = new AsyncRelayCommand(
+            BufferNextMinuteAsync,
+            () => !IsLoading && _timeline is { BufferedDuration: var buffered, Duration: var duration } && buffered < duration);
+
         OpenSessionFinderCommand = new RelayCommand(() => IsSessionFinderOpen = true);
         CloseSessionFinderCommand = new RelayCommand(() => IsSessionFinderOpen = false);
     }
@@ -46,6 +50,7 @@ public class MainViewModel : BindableBase, IDisposable
     }
 
     public ICommand LoadReplayCommand { get; }
+    public ICommand BufferNextMinuteCommand { get; }
     public ICommand OpenSessionFinderCommand { get; }
     public ICommand CloseSessionFinderCommand { get; }
 
@@ -89,6 +94,8 @@ public class MainViewModel : BindableBase, IDisposable
             {
                 command.RaiseCanExecuteChanged();
             }
+
+            RaiseBufferNextMinuteCanExecuteChanged();
         }
     }
 
@@ -135,7 +142,7 @@ public class MainViewModel : BindableBase, IDisposable
             IsLoading = true;
             StatusText = $"Loading OpenF1 data for {sessionDescription}...";
 
-            ReplayLoadResult result = await _replayLoader.LoadAsync(sessionKey);
+            ReplayLoadResult result = await _replayLoader.LoadInitialAsync(sessionKey);
             LoadReplay(result);
             StatusText = BuildLoadedStatus(result);
         }
@@ -158,11 +165,36 @@ public class MainViewModel : BindableBase, IDisposable
     private void LoadReplay(ReplayLoadResult result)
     {
         _timeline = result.Timeline;
-        TrackMap.Load(result.Data);
-        DriverTable.Load(result.Data.Drivers);
+        TrackMap.Init(result.Data);
+        DriverTable.Init(result.Data.Drivers);
         Playback.Load(result.Timeline);
+        RaiseBufferNextMinuteCanExecuteChanged();
     }
 
+    private async Task BufferNextMinuteAsync()
+    {
+        if (_timeline is not ReplayTimeline timeline)
+        {
+            return;
+        }
+
+        StatusText = "Buffering the next minute...";
+
+        try
+        {
+            await _replayLoader.LoadNextChunkAsync(timeline);
+            Playback.RefreshBufferedDuration();
+            StatusText = $"Buffered {timeline.BufferedDuration:mm\\:ss} of {timeline.Duration:mm\\:ss}.";
+        }
+        catch (Exception exception)
+        {
+            StatusText = $"Buffering failed: {exception.Message}";
+        }
+        finally
+        {
+            RaiseBufferNextMinuteCanExecuteChanged();
+        }
+    }
     private void ClearReplay()
     {
         _timeline = null;
@@ -170,6 +202,15 @@ public class MainViewModel : BindableBase, IDisposable
         DriverTable.Clear();
         TrackMap.Clear();
         Telemetry.SelectDriver(null);
+        RaiseBufferNextMinuteCanExecuteChanged();
+    }
+
+    private void RaiseBufferNextMinuteCanExecuteChanged()
+    {
+        if (BufferNextMinuteCommand is AsyncRelayCommand command)
+        {
+            command.RaiseCanExecuteChanged();
+        }
     }
 
     private void OnPlaybackPositionChanged(
@@ -205,18 +246,12 @@ public class MainViewModel : BindableBase, IDisposable
         using Process process = Process.GetCurrentProcess();
         process.Refresh();
 
-        ReplayData replayData = result.Data;
         ReplayTimeline timeline = result.Timeline;
 
         return
             $"Loaded {timeline.DriverCount:N0} driver streams in " +
             $"{result.TotalElapsed.TotalSeconds:0.0}s " +
             $"(timeline build {result.BuildElapsed.TotalMilliseconds:N0}ms). " +
-            $"Streams: {replayData.Locations.Count:N0} locations, " +
-            $"{replayData.Positions.Count:N0} positions, " +
-            $"{replayData.CarTelemetry.Count:N0} telemetry, " +
-            $"{replayData.Intervals.Count:N0} intervals, " +
-            $"{replayData.Laps.Count:N0} laps. " +
             $"Managed heap: {ToMb(managedBytes):0.0} MB, " +
             $"Working set: {ToMb(process.WorkingSet64):0.0} MB, " +
             $"Private memory: {ToMb(process.PrivateMemorySize64):0.0} MB";

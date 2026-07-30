@@ -98,6 +98,11 @@
                             Margin="8,0,0,0"
                             Content="Stop"
                             Command="{Binding Playback.StopCommand}" />
+                    <Button Width="70"
+                            Height="34"
+                            Margin="8,0,0,0"
+                            Content="Buffer"
+                            Command="{Binding BufferNextMinuteCommand}" />
                 </StackPanel>
 
                 <Grid Grid.Column="1"

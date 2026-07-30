@@ -29,7 +29,7 @@ public class DriverTableViewModel : BindableBase
         }
     }
 
-    public void Load(IReadOnlyList<OpenF1Driver> drivers)
+    public void Init(IReadOnlyList<OpenF1Driver> drivers)
     {
         ArgumentNullException.ThrowIfNull(drivers);
 

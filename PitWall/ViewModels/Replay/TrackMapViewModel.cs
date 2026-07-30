@@ -30,7 +30,7 @@ public class TrackMapViewModel : BindableBase
         private set => SetProperty(ref _trackPath, value);
     }
 
-    public void Load(ReplayData replayData)
+    public void Init(InitialReplayData replayData)
     {
         ArgumentNullException.ThrowIfNull(replayData);
 
@@ -97,7 +97,7 @@ public class TrackMapViewModel : BindableBase
         _markersByDriver.Clear();
     }
 
-    private PointCollection BuildTrackPath(ReplayData replayData)
+    private PointCollection BuildTrackPath(InitialReplayData replayData)
     {
         PointCollection path = new();
 
@@ -128,7 +128,7 @@ public class TrackMapViewModel : BindableBase
         return path;
     }
 
-    private static string GetTrackTitle(ReplayData replayData)
+    private static string GetTrackTitle(InitialReplayData replayData)
     {
         return
             replayData.Meeting?.CircuitShortName ??
@@ -139,7 +139,7 @@ public class TrackMapViewModel : BindableBase
     }
 
     private static IReadOnlyList<OpenF1Location> FindValidLapLocations(
-        ReplayData replayData)
+        InitialReplayData replayData)
     {
         Dictionary<DriverNumber, OpenF1Location[]> locationsByDriver =
             replayData.Locations

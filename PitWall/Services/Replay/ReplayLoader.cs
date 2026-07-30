@@ -16,7 +16,7 @@ public class ReplayLoader
             ?? throw new ArgumentNullException(nameof(replayBuilder));
     }
 
-    public async Task<ReplayLoadResult> LoadAsync(SessionKey sessionKey, CancellationToken cancellationToken = default)
+    public async Task<ReplayLoadResult> LoadInitialAsync(SessionKey sessionKey, CancellationToken cancellationToken = default)
     {
         Stopwatch loadTimer = Stopwatch.StartNew();
         InitialReplayData initalReplayData =
@@ -32,6 +32,30 @@ public class ReplayLoader
             timeline,
             loadTimer.Elapsed,
             buildTimer.Elapsed);
+    }
+
+    public async Task LoadNextChunkAsync(ReplayTimeline timeline, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(timeline);
+
+        TimeSpan remainingDuration = timeline.Duration - timeline.BufferedDuration;
+
+        if (remainingDuration <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        TimeSpan chunkLength = TimeSpan.FromMinutes(1);
+        chunkLength = TimeSpan.FromTicks(Math.Min(chunkLength.Ticks, remainingDuration.Ticks));
+        DateTimeOffset chunkStart = timeline.SessionStart + timeline.BufferedDuration;
+
+        ReplayDataChunk chunk = await _sessionDataService.LoadReplayChunk(
+            timeline.SessionKey,
+            chunkStart,
+            chunkLength,
+            cancellationToken);
+
+        _replayBuilder.AppendChunk(timeline, chunk);
     }
 }
 
