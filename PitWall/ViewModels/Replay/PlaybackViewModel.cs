@@ -66,8 +66,13 @@ public class PlaybackViewModel : BindableBase, IDisposable
         set
         {
             double boundedValue = double.IsFinite(value) ? Math.Max(0.1, value) : 1.0;
+            TimeSpan elapsedAtCurrentSpeed = TimeSpan.FromTicks((long)(_playbackClock.Elapsed.Ticks * _playbackSpeed));
 
-            SetProperty(ref _playbackSpeed, boundedValue);
+            if (SetProperty(ref _playbackSpeed, boundedValue) && IsPlaying)
+            {
+                _playbackStartTime += elapsedAtCurrentSpeed;
+                _playbackClock.Restart();
+            }
         }
     }
 
