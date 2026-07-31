@@ -34,7 +34,7 @@ public class ReplayLoader
             buildTimer.Elapsed);
     }
 
-    public async Task LoadNextChunkAsync(ReplayTimeline timeline, CancellationToken cancellationToken = default)
+    public async Task LoadNextChunkAsync(ReplayTimeline timeline, TimeSpan chunkLength, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(timeline);
 
@@ -45,7 +45,6 @@ public class ReplayLoader
             return;
         }
 
-        TimeSpan chunkLength = TimeSpan.FromMinutes(1);
         chunkLength = TimeSpan.FromTicks(Math.Min(chunkLength.Ticks, remainingDuration.Ticks));
         DateTimeOffset chunkStart = timeline.SessionStart + timeline.BufferedDuration;
 
