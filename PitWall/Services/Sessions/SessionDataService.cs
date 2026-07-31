@@ -70,7 +70,7 @@ public class SessionDataService
         }
     }
 
-    public async Task<InitialReplayData> LoadInitalReplayChunk(SessionKey sessionKey, TimeSpan chunkLength, CancellationToken cancellationToken)
+    public async Task<InitialReplayData> LoadInitialReplayChunk(SessionKey sessionKey, TimeSpan chunkLength, CancellationToken cancellationToken)
     {
         //Non-Buffered Data
 

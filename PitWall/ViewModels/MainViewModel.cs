@@ -10,8 +10,8 @@ namespace PitWall.ViewModels;
 
 public class MainViewModel : BindableBase, IDisposable
 {
-    private readonly TimeSpan AutoBufferThreshold = TimeSpan.FromSeconds(60);
-    private readonly TimeSpan BufferChunkLength = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan AutoBufferThreshold = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan BufferChunkLength = TimeSpan.FromMinutes(2);
     private readonly ReplayLoader _replayLoader;
     private ReplayTimeline? _timeline;
     private string _sessionKeyText = "latest";
@@ -19,8 +19,8 @@ public class MainViewModel : BindableBase, IDisposable
     private bool _isLoading;
     private bool _isSessionFinderOpen;
     private bool _isDisposed;
-    private bool _isBuffering = false;
-    private TimeSpan? _lastAttemptedBufferEnd;
+    private bool _isBuffering;
+    private TimeSpan? _lastAutoBufferAttemptedEnd; //Holds the time at the end of the currently buffered replay when a new chunk was requested to stop duplicating requests that fail.
 
     public MainViewModel(ReplayLoader replayLoader, SessionFinderViewModel sessionFinderViewModel)
     {
@@ -196,7 +196,7 @@ public class MainViewModel : BindableBase, IDisposable
     private void ClearReplay()
     {
         _timeline = null;
-        _lastAttemptedBufferEnd = null;
+        _lastAutoBufferAttemptedEnd = null;
         Playback.Clear();
         DriverTable.Clear();
         TrackMap.Clear();
@@ -229,12 +229,12 @@ public class MainViewModel : BindableBase, IDisposable
 
         TimeSpan remainingBufferedTime = timeline.BufferedDuration - playheadPosition;
 
-        if (remainingBufferedTime > AutoBufferThreshold || _lastAttemptedBufferEnd == timeline.BufferedDuration)
+        if (remainingBufferedTime > AutoBufferThreshold || _lastAutoBufferAttemptedEnd == timeline.BufferedDuration)
         {
             return;
         }
 
-        _lastAttemptedBufferEnd = timeline.BufferedDuration;
+        _lastAutoBufferAttemptedEnd = timeline.BufferedDuration;
         _ = BufferNextChunkAsync(BufferChunkLength);
     }
 

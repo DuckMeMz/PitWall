@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using PitWall.Commands;
 using PitWall.Common;
 using PitWall.Models;
@@ -245,7 +246,16 @@ public class PlaybackViewModel : BindableBase, IDisposable
         if (targetTime >= bufferedDuration)
         {
             SeekTo(bufferedDuration, resetPlaybackClock: false);
-            PauseForBuffer();
+
+            if(bufferedDuration == _timeline!.Duration)
+            {
+                Pause();
+            }
+            else
+            {
+                PauseForBuffer();
+            }
+
             return;
         }
 

@@ -7,7 +7,7 @@ public class ReplayLoader
 {
     private readonly SessionDataService _sessionDataService;
     private readonly ReplayBuilder _replayBuilder;
-    private readonly TimeSpan _initalChunkLength = TimeSpan.FromMinutes(1);
+    private readonly TimeSpan _initialChunkLength = TimeSpan.FromMinutes(1);
 
     public ReplayLoader(SessionDataService sessionDataService, ReplayBuilder replayBuilder)
     {
@@ -20,16 +20,16 @@ public class ReplayLoader
     public async Task<ReplayLoadResult> LoadInitialAsync(SessionKey sessionKey, CancellationToken cancellationToken = default)
     {
         Stopwatch loadTimer = Stopwatch.StartNew();
-        InitialReplayData initalReplayData =
-            await _sessionDataService.LoadInitalReplayChunk(sessionKey, _initalChunkLength, cancellationToken);
+        InitialReplayData initialReplayData =
+            await _sessionDataService.LoadInitialReplayChunk(sessionKey, _initialChunkLength, cancellationToken);
 
         Stopwatch buildTimer = Stopwatch.StartNew();
-        ReplayTimeline timeline = _replayBuilder.BuildInitialTimeline(initalReplayData);
+        ReplayTimeline timeline = _replayBuilder.BuildInitialTimeline(initialReplayData);
         buildTimer.Stop();
         loadTimer.Stop();
 
         return new ReplayLoadResult(
-            initalReplayData,
+            initialReplayData,
             timeline,
             loadTimer.Elapsed,
             buildTimer.Elapsed);

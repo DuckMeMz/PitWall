@@ -1,9 +1,8 @@
 ﻿using PitWall.Models.OpenF1Api;
-using System.Xaml.Schema;
 
 namespace PitWall.Models;
 
-public record ReplayTimeline
+public class ReplayTimeline
 {
     public SessionKey SessionKey { get; init; }
     public DateTimeOffset SessionStart { get; init; }
