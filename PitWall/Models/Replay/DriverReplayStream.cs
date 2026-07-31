@@ -173,6 +173,7 @@ public class DriverReplayStream
     }
     public DriverReplayState GetStateAt(DateTimeOffset timestamp)
     {
+        
         return new DriverReplayState(
             DriverNumber,
             Position: SampleLatest(Positions, timestamp, position => position.Timestamp)?.Position,
@@ -210,7 +211,14 @@ public class DriverReplayStream
 
         if (latestIndex < 0)
         {
-            return null;
+            OpenF1Location first = samples[0];
+
+            return new ReplayLocation(
+                first.X,
+                first.Y,
+                first.Z,
+                first.Timestamp!.Value,
+                lastMovementTimestamps[0]);
         }
 
         DateTimeOffset lastMovementTimestamp = lastMovementTimestamps[latestIndex];
@@ -258,15 +266,15 @@ public class DriverReplayStream
             OpenF1CarTelemetrySample? latest =
                 SampleLatest(samples, timestamp, sample => sample.Timestamp);
 
-            return latest is null
-                ? null
-                : new ReplayTelemetry(
-                    latest.Throttle,
-                    latest.Brake,
-                    latest.Speed,
-                    latest.Rpm,
-                    latest.Gear,
-                    latest.Drs);
+            OpenF1CarTelemetrySample sample = latest ?? samples[0];
+
+            return new ReplayTelemetry(
+                sample.Throttle,
+                sample.Brake,
+                sample.Speed,
+                sample.Rpm,
+                sample.Gear,
+                sample.Drs);
         }
 
         return new ReplayTelemetry(
