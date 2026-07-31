@@ -50,7 +50,6 @@ public class MainViewModel : BindableBase, IDisposable
     }
 
     public ICommand LoadReplayCommand { get; }
-    public ICommand BufferNextMinuteCommand { get; }
     public ICommand OpenSessionFinderCommand { get; }
     public ICommand CloseSessionFinderCommand { get; }
 
@@ -94,8 +93,6 @@ public class MainViewModel : BindableBase, IDisposable
             {
                 command.RaiseCanExecuteChanged();
             }
-
-            RaiseBufferNextChunkCanExecuteChanged();
         }
     }
 
@@ -168,26 +165,24 @@ public class MainViewModel : BindableBase, IDisposable
         TrackMap.Init(result.Data);
         DriverTable.Init(result.Data.Drivers);
         Playback.Load(result.Timeline);
-        RaiseBufferNextChunkCanExecuteChanged();
     }
 
     private async Task BufferNextChunkAsync(TimeSpan chunkLength)
     {
-        if (!CanBufferNextMinute() || _timeline is not ReplayTimeline timeline)
+        if (!CanBufferNextChunk() || _timeline is not ReplayTimeline timeline)
         {
             return;
         }
 
         _isBuffering = true;
-        RaiseBufferNextChunkCanExecuteChanged();
-        StatusText = "Buffering the next minute...";
+        StatusText = $"Buffering the next chunk. Size: {chunkLength.TotalMinutes} minute[s]";
 
         try
         {
             await _replayLoader.LoadNextChunkAsync(timeline, chunkLength);
             Playback.RefreshBufferedDuration();
             Playback.ResumeAfterBuffering();
-            StatusText = $"Buffered {timeline.BufferedDuration:mm\\:ss} of {timeline.Duration:mm\\:ss}.";
+            StatusText = $"Buffered {timeline.BufferedDuration:hh\\:mm\\:ss} of {timeline.Duration:hh\\:mm\\:ss}.";
         }
         catch (Exception exception)
         {
@@ -196,7 +191,6 @@ public class MainViewModel : BindableBase, IDisposable
         finally
         {
             _isBuffering = false;
-            RaiseBufferNextChunkCanExecuteChanged();
         }
     }
     private void ClearReplay()
@@ -207,15 +201,6 @@ public class MainViewModel : BindableBase, IDisposable
         DriverTable.Clear();
         TrackMap.Clear();
         Telemetry.SelectDriver(null);
-        RaiseBufferNextChunkCanExecuteChanged();
-    }
-
-    private void RaiseBufferNextChunkCanExecuteChanged()
-    {
-        if (BufferNextMinuteCommand is AsyncRelayCommand command)
-        {
-            command.RaiseCanExecuteChanged();
-        }
     }
 
     private void OnPlaybackPositionChanged(
@@ -237,7 +222,7 @@ public class MainViewModel : BindableBase, IDisposable
 
     private void TryAutoBuffer(ReplayTimeline timeline, TimeSpan playheadPosition)
     {
-        if (!Playback.IsPlaying || !CanBufferNextMinute())
+        if (!Playback.IsPlaying || !CanBufferNextChunk())
         {
             return;
         }
@@ -253,7 +238,7 @@ public class MainViewModel : BindableBase, IDisposable
         _ = BufferNextChunkAsync(BufferChunkLength);
     }
 
-    private bool CanBufferNextMinute()
+    private bool CanBufferNextChunk()
     {
         return !IsLoading && !_isBuffering && _timeline is { BufferedDuration: var buffered, Duration: var duration } && buffered < duration;
     }

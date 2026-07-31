@@ -7,6 +7,7 @@ public class ReplayLoader
 {
     private readonly SessionDataService _sessionDataService;
     private readonly ReplayBuilder _replayBuilder;
+    private readonly TimeSpan _initalChunkLength = TimeSpan.FromMinutes(1);
 
     public ReplayLoader(SessionDataService sessionDataService, ReplayBuilder replayBuilder)
     {
@@ -20,7 +21,7 @@ public class ReplayLoader
     {
         Stopwatch loadTimer = Stopwatch.StartNew();
         InitialReplayData initalReplayData =
-            await _sessionDataService.LoadInitalReplayChunk(sessionKey, TimeSpan.FromMinutes(1), cancellationToken);
+            await _sessionDataService.LoadInitalReplayChunk(sessionKey, _initalChunkLength, cancellationToken);
 
         Stopwatch buildTimer = Stopwatch.StartNew();
         ReplayTimeline timeline = _replayBuilder.BuildInitialTimeline(initalReplayData);
