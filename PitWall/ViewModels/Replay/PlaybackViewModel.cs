@@ -16,6 +16,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
     private double _durationSeconds;
     private double _playbackSpeed = 1.0;
     private bool _isPlaying;
+    private bool _resumeWhenBuffered;
     private bool _isEnabled = true;
     private bool _isRendering;
     private bool _isDisposed;
@@ -135,6 +136,19 @@ public class PlaybackViewModel : BindableBase, IDisposable
         OnPropertyChanged(nameof(BufferedSeconds));
     }
 
+    public void ResumeAfterBuffering()
+    {
+        if (!_resumeWhenBuffered || !HasReplay || CurrentTimeSeconds >= BufferedSeconds)
+        {
+            return;
+        }
+
+        _resumeWhenBuffered = false;
+        _playbackStartTime = TimeSpan.FromSeconds(CurrentTimeSeconds);
+        _playbackClock.Restart();
+        StartRendering();
+        IsPlaying = true;
+    }
     public void Stop()
     {
         Pause();
@@ -183,6 +197,15 @@ public class PlaybackViewModel : BindableBase, IDisposable
     {
         StopRendering();
         _playbackClock.Stop();
+        _resumeWhenBuffered = false;
+        IsPlaying = false;
+    }
+
+    private void PauseForBuffer()
+    {
+        StopRendering();
+        _playbackClock.Stop();
+        _resumeWhenBuffered = true;
         IsPlaying = false;
     }
 
@@ -217,7 +240,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
         if (targetTime >= bufferedDuration)
         {
             SeekTo(bufferedDuration, resetPlaybackClock: false);
-            Pause();
+            PauseForBuffer();
             return;
         }
 

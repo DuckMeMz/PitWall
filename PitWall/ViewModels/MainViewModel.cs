@@ -10,6 +10,8 @@ namespace PitWall.ViewModels;
 
 public class MainViewModel : BindableBase, IDisposable
 {
+    private readonly TimeSpan AutoBufferThreshold = TimeSpan.FromSeconds(60);
+    private readonly TimeSpan BufferChunkLength = TimeSpan.FromMinutes(2);
     private readonly ReplayLoader _replayLoader;
     private ReplayTimeline? _timeline;
     private string _sessionKeyText = "latest";
@@ -17,6 +19,8 @@ public class MainViewModel : BindableBase, IDisposable
     private bool _isLoading;
     private bool _isSessionFinderOpen;
     private bool _isDisposed;
+    private bool _isBuffering = false;
+    private TimeSpan? _lastAttemptedBufferEnd;
 
     public MainViewModel(ReplayLoader replayLoader, SessionFinderViewModel sessionFinderViewModel)
     {
@@ -35,10 +39,6 @@ public class MainViewModel : BindableBase, IDisposable
         LoadReplayCommand = new AsyncRelayCommand(
             LoadReplayAsync,
             () => !IsLoading);
-
-        BufferNextMinuteCommand = new AsyncRelayCommand(
-            BufferNextMinuteAsync,
-            () => !IsLoading && _timeline is { BufferedDuration: var buffered, Duration: var duration } && buffered < duration);
 
         OpenSessionFinderCommand = new RelayCommand(() => IsSessionFinderOpen = true);
         CloseSessionFinderCommand = new RelayCommand(() => IsSessionFinderOpen = false);
@@ -95,7 +95,7 @@ public class MainViewModel : BindableBase, IDisposable
                 command.RaiseCanExecuteChanged();
             }
 
-            RaiseBufferNextMinuteCanExecuteChanged();
+            RaiseBufferNextChunkCanExecuteChanged();
         }
     }
 
@@ -168,22 +168,25 @@ public class MainViewModel : BindableBase, IDisposable
         TrackMap.Init(result.Data);
         DriverTable.Init(result.Data.Drivers);
         Playback.Load(result.Timeline);
-        RaiseBufferNextMinuteCanExecuteChanged();
+        RaiseBufferNextChunkCanExecuteChanged();
     }
 
-    private async Task BufferNextMinuteAsync()
+    private async Task BufferNextChunkAsync(TimeSpan chunkLength)
     {
-        if (_timeline is not ReplayTimeline timeline)
+        if (!CanBufferNextMinute() || _timeline is not ReplayTimeline timeline)
         {
             return;
         }
 
+        _isBuffering = true;
+        RaiseBufferNextChunkCanExecuteChanged();
         StatusText = "Buffering the next minute...";
 
         try
         {
-            await _replayLoader.LoadNextChunkAsync(timeline);
+            await _replayLoader.LoadNextChunkAsync(timeline, chunkLength);
             Playback.RefreshBufferedDuration();
+            Playback.ResumeAfterBuffering();
             StatusText = $"Buffered {timeline.BufferedDuration:mm\\:ss} of {timeline.Duration:mm\\:ss}.";
         }
         catch (Exception exception)
@@ -192,20 +195,22 @@ public class MainViewModel : BindableBase, IDisposable
         }
         finally
         {
-            RaiseBufferNextMinuteCanExecuteChanged();
+            _isBuffering = false;
+            RaiseBufferNextChunkCanExecuteChanged();
         }
     }
     private void ClearReplay()
     {
         _timeline = null;
+        _lastAttemptedBufferEnd = null;
         Playback.Clear();
         DriverTable.Clear();
         TrackMap.Clear();
         Telemetry.SelectDriver(null);
-        RaiseBufferNextMinuteCanExecuteChanged();
+        RaiseBufferNextChunkCanExecuteChanged();
     }
 
-    private void RaiseBufferNextMinuteCanExecuteChanged()
+    private void RaiseBufferNextChunkCanExecuteChanged()
     {
         if (BufferNextMinuteCommand is AsyncRelayCommand command)
         {
@@ -227,8 +232,31 @@ public class MainViewModel : BindableBase, IDisposable
             eventArgs.Position,
             Playback.IsPlaying);
         TrackMap.Update(timeline, eventArgs.Position);
+        TryAutoBuffer(timeline, eventArgs.Position);
     }
 
+    private void TryAutoBuffer(ReplayTimeline timeline, TimeSpan playheadPosition)
+    {
+        if (!Playback.IsPlaying || !CanBufferNextMinute())
+        {
+            return;
+        }
+
+        TimeSpan remainingBufferedTime = timeline.BufferedDuration - playheadPosition;
+
+        if (remainingBufferedTime > AutoBufferThreshold || _lastAttemptedBufferEnd == timeline.BufferedDuration)
+        {
+            return;
+        }
+
+        _lastAttemptedBufferEnd = timeline.BufferedDuration;
+        _ = BufferNextChunkAsync(BufferChunkLength);
+    }
+
+    private bool CanBufferNextMinute()
+    {
+        return !IsLoading && !_isBuffering && _timeline is { BufferedDuration: var buffered, Duration: var duration } && buffered < duration;
+    }
     private void OnSelectedDriverChanged(object? sender, EventArgs eventArgs)
     {
         ReplayDriverRow? selectedDriver = DriverTable.SelectedDriver;
