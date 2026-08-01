@@ -21,6 +21,6 @@ public static class AppComposition
 
         SessionFinderViewModel sessionFinderViewModel = new(sessionCatalog);
 
-        return new MainViewModel(replayLoader, sessionFinderViewModel);
+        return new MainViewModel(replayLoader, sessionData, sessionFinderViewModel);
     }
 }

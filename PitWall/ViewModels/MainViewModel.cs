@@ -1,9 +1,9 @@
 using System.Diagnostics;
-using System.Net.Http;
 using System.Windows.Input;
 using PitWall.Commands;
 using PitWall.Common;
 using PitWall.Models;
+using PitWall.Models.OpenF1Api;
 using PitWall.Services;
 
 namespace PitWall.ViewModels;
@@ -12,7 +12,12 @@ public class MainViewModel : BindableBase, IDisposable
 {
     private static readonly TimeSpan AutoBufferThreshold = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan BufferChunkLength = TimeSpan.FromMinutes(2);
+    private const double MinimumTrackMapLapDurationSeconds = 45;
+    private const double MaximumTrackMapLapDurationSeconds = 200;
+    private const int TrackMapCandidateLapCount = 3;
+    private const int MinimumTrackMapCoordinateCount = 100;
     private readonly ReplayLoader _replayLoader;
+    private readonly SessionDataService _sessionData;
     private ReplayTimeline? _timeline;
     private string _sessionKeyText = "latest";
     private string _statusText = "Enter a session key and load replay data.";
@@ -22,9 +27,10 @@ public class MainViewModel : BindableBase, IDisposable
     private bool _isBuffering;
     private TimeSpan? _lastAutoBufferAttemptedEnd; //Holds the time at the end of the currently buffered replay when a new chunk was requested to stop duplicating requests that fail.
 
-    public MainViewModel(ReplayLoader replayLoader, SessionFinderViewModel sessionFinderViewModel)
+    public MainViewModel(ReplayLoader replayLoader, SessionDataService sessionDataService, SessionFinderViewModel sessionFinderViewModel)
     {
         _replayLoader = replayLoader ?? throw new ArgumentNullException(nameof(replayLoader));
+        _sessionData = sessionDataService ?? throw new ArgumentNullException(nameof(replayLoader));
 
         Playback = new PlaybackViewModel();
         TrackMap = new TrackMapViewModel();
@@ -122,10 +128,10 @@ public class MainViewModel : BindableBase, IDisposable
             return;
         }
 
-        await LoadReplayAsync(sessionKey, SessionKeyText.Trim());
+        await LoadReplayAsync(sessionKey, SessionKeyText.Trim(), CancellationToken.None);
     }
 
-    private async Task LoadReplayAsync(SessionKey sessionKey, string sessionDescription)
+    private async Task LoadReplayAsync(SessionKey sessionKey, string sessionDescription, CancellationToken cancellationToken)
     {
         if (IsLoading)
         {
@@ -140,7 +146,7 @@ public class MainViewModel : BindableBase, IDisposable
             StatusText = $"Loading OpenF1 data for {sessionDescription}...";
 
             ReplayLoadResult result = await _replayLoader.LoadInitialAsync(sessionKey);
-            LoadReplay(result);
+            await LoadReplay(result, cancellationToken);
             StatusText = BuildLoadedStatus(result);
         }
         catch (Exception exception)
@@ -157,16 +163,80 @@ public class MainViewModel : BindableBase, IDisposable
     {
         SessionKeyText = session.SessionKey.Value.ToString();
         IsSessionFinderOpen = false;
-        _ = LoadReplayAsync(session.SessionKey, session.SessionName);
+        _ = LoadReplayAsync(session.SessionKey, session.SessionName, CancellationToken.None);
     }
-    private void LoadReplay(ReplayLoadResult result)
+    private async Task LoadReplay(ReplayLoadResult result, CancellationToken cancellationToken)
     {
         _timeline = result.Timeline;
-        TrackMap.Init(result.Data);
+
+        string TrackName =
+            result.Data.Meeting!.CircuitShortName ??
+            result.Data.Session.CircuitShortName ??
+            result.Data.Meeting.MeetingName ??
+            result.Data.Session.Location ??
+            "Track map";
+
+        IReadOnlyList<OpenF1Lap> mapLaps = result.Data.Session.SessionType == SessionType.Qualifying
+            ? result.Data.Laps
+            : await _sessionData.GetQualifyingLapsAsync(
+                result.Data.Session.MeetingKey,
+                cancellationToken);
+
+        if (mapLaps.Count == 0)
+        {
+            Debug.WriteLine("No normal qualifying session was found; using the replay session for the track map.");
+            mapLaps = result.Data.Laps;
+        }
+
+        IReadOnlyList<OpenF1Location> mapLocations = await LoadTrackMapLocationsAsync(mapLaps, cancellationToken);
+
+        TrackMap.Init(
+            TrackName,
+            result.Data.Drivers,
+            mapLocations);
+
         DriverTable.Init(result.Data.Drivers);
         Playback.Load(result.Timeline);
     }
 
+    private async Task<IReadOnlyList<OpenF1Location>> LoadTrackMapLocationsAsync(IReadOnlyList<OpenF1Lap> laps, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<OpenF1Location>? fallbackLocations = null;
+
+        foreach (OpenF1Lap lap in laps
+            .Where(lap =>
+                lap.TimestampStart.HasValue &&
+                lap.LapDuration is >= MinimumTrackMapLapDurationSeconds and <= MaximumTrackMapLapDurationSeconds &&
+                lap.IsPitOutLap is not true)
+            .OrderBy(lap => lap.LapDuration)
+            .Take(TrackMapCandidateLapCount))
+        {
+            IReadOnlyList<OpenF1Location> locations = await _sessionData.GetLapLocationsAsync(lap, cancellationToken);
+
+            fallbackLocations ??= locations;
+
+            int coordinateCount = locations
+                .Where(location => location.X.HasValue && location.Y.HasValue)
+                .Select(location => (location.X!.Value, location.Y!.Value))
+                .Distinct()
+                .Count();
+
+            if (coordinateCount >= MinimumTrackMapCoordinateCount)
+            {
+                Debug.WriteLine(
+                    $"Selected track-map lap {lap.LapNumber.Value} for driver {lap.DriverNumber.Value}: " +
+                    $"{coordinateCount} distinct coordinates.");
+
+                return locations;
+            }
+
+            Debug.WriteLine(
+                $"Rejected track-map lap {lap.LapNumber.Value} for driver {lap.DriverNumber.Value}: " +
+                $"only {coordinateCount} distinct coordinates.");
+        }
+
+        return fallbackLocations ?? throw new InvalidOperationException("No suitable completed lap was found to build the track map.");
+    }
     private async Task BufferNextChunkAsync(TimeSpan chunkLength)
     {
         if (!CanBufferNextChunk() || _timeline is not ReplayTimeline timeline)
