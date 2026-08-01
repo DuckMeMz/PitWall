@@ -29,7 +29,7 @@ public class DriverTableViewModel : BindableBase
         }
     }
 
-    public void Init(IReadOnlyList<OpenF1Driver> drivers)
+    public void Initialise(IReadOnlyList<OpenF1Driver> drivers)
     {
         ArgumentNullException.ThrowIfNull(drivers);
 
@@ -47,10 +47,7 @@ public class DriverTableViewModel : BindableBase
         SelectedDriver = DriverStates.FirstOrDefault();
     }
 
-    public void Update(
-        ReplayTimeline timeline,
-        TimeSpan targetTime,
-        bool isPlaying)
+    public void Update(ReplayTimeline timeline, TimeSpan targetTime, bool isPlaying)
     {
         ArgumentNullException.ThrowIfNull(timeline);
 

@@ -9,10 +9,9 @@ public class SessionDataService
 {
     private readonly OpenF1Client _client;
 
-    private bool replayInitialised = false;
-    private OpenF1Session? currentSession = null;
-    private OpenF1Meeting? currentMeeting = null;
-    private IReadOnlyList<OpenF1Driver>? currentDrivers = null;
+    private bool _replayInitialised;
+    private OpenF1Session? _currentSession;
+    private OpenF1Meeting? _currentMeeting;
 
     public SessionDataService(OpenF1Client client)
     {
@@ -74,16 +73,13 @@ public class SessionDataService
     {
         //Non-Buffered Data
 
-        currentSession = await GetSingleSession(sessionKey, cancellationToken);
+        _currentSession = await GetSingleSession(sessionKey, cancellationToken);
 
-        currentDrivers = await _client.GetDriversAsync(
+        IReadOnlyList<OpenF1Driver> drivers = await _client.GetDriversAsync(
            cancellationToken: cancellationToken,
            sessionKey: sessionKey);
 
-        OpenF1Session session = currentSession
-            ?? throw new InvalidOperationException("The replay has not been initialized.");
-
-        IReadOnlyList<OpenF1Driver> drivers = currentDrivers
+        OpenF1Session session = _currentSession
             ?? throw new InvalidOperationException("The replay has not been initialized.");
 
 
@@ -174,9 +170,9 @@ public class SessionDataService
            intervalsTask,
            lapsTask);
 
-        currentMeeting = (await meetingTask).FirstOrDefault();
+        _currentMeeting = (await meetingTask).FirstOrDefault();
 
-        replayInitialised = true;
+        _replayInitialised = true;
 
         return new InitialReplayData(
             session,
@@ -187,20 +183,17 @@ public class SessionDataService
             await intervalsTask,
             await lapsTask,
             chunkLength,
-            currentMeeting);
+            _currentMeeting);
     }
 
     public async Task<ReplayDataChunk> LoadReplayChunk(SessionKey sessionKey, DateTimeOffset chunkStart, TimeSpan chunkLength, CancellationToken cancellationToken = default)
     {
-        if (!replayInitialised || currentSession is null || currentSession!.SessionKey != sessionKey)
+        if (!_replayInitialised || _currentSession is null || _currentSession!.SessionKey != sessionKey)
         {
             throw new InvalidOperationException($"LoadInitialReplayChunk must be called before loading more replay chunks");
         }
 
-        OpenF1Session session = currentSession
-            ?? throw new InvalidOperationException("The replay has not been initialized.");
-
-        IReadOnlyList<OpenF1Driver> drivers = currentDrivers
+        OpenF1Session session = _currentSession
             ?? throw new InvalidOperationException("The replay has not been initialized.");
 
         DateTimeOffset chunkEnd = chunkStart + chunkLength;
@@ -272,7 +265,7 @@ public class SessionDataService
             await intervalsTask,
             chunkStart,
             chunkLength,
-            currentMeeting);
+            _currentMeeting);
     }
     public async Task<IReadOnlyList<OpenF1Location>> GetLapLocationsAsync(OpenF1Lap lap, CancellationToken cancellationToken = default)
     {

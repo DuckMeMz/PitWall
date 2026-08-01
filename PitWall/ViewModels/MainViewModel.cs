@@ -3,37 +3,33 @@ using System.Windows.Input;
 using PitWall.Commands;
 using PitWall.Common;
 using PitWall.Models;
-using PitWall.Models.OpenF1Api;
 using PitWall.Services;
 
 namespace PitWall.ViewModels;
 
 public class MainViewModel : BindableBase, IDisposable
 {
-    private static readonly TimeSpan AutoBufferThreshold = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan BufferChunkLength = TimeSpan.FromMinutes(2);
-    private const double MinimumTrackMapLapDurationSeconds = 45;
-    private const double MaximumTrackMapLapDurationSeconds = 200;
-    private const int TrackMapCandidateLapCount = 3;
-    private const int MinimumTrackMapCoordinateCount = 100;
     private readonly ReplayLoader _replayLoader;
-    private readonly SessionDataService _sessionData;
+    private readonly BufferController _bufferController;
     private ReplayTimeline? _timeline;
+    private CancellationTokenSource? _replayCancellationTokenSource;
     private string _sessionKeyText = "latest";
     private string _statusText = "Enter a session key and load replay data.";
     private bool _isLoading;
     private bool _isSessionFinderOpen;
     private bool _isDisposed;
-    private bool _isBuffering;
-    private TimeSpan? _lastAutoBufferAttemptedEnd; //Holds the time at the end of the currently buffered replay when a new chunk was requested to stop duplicating requests that fail.
 
-    public MainViewModel(ReplayLoader replayLoader, SessionDataService sessionDataService, SessionFinderViewModel sessionFinderViewModel)
+    public MainViewModel(
+        ReplayLoader replayLoader,
+        BufferController bufferCoordinator,
+        TrackMapViewModel trackMapViewModel,
+        SessionFinderViewModel sessionFinderViewModel)
     {
         _replayLoader = replayLoader ?? throw new ArgumentNullException(nameof(replayLoader));
-        _sessionData = sessionDataService ?? throw new ArgumentNullException(nameof(replayLoader));
+        _bufferController = bufferCoordinator ?? throw new ArgumentNullException(nameof(bufferCoordinator));
 
         Playback = new PlaybackViewModel();
-        TrackMap = new TrackMapViewModel();
+        TrackMap = trackMapViewModel ?? throw new ArgumentNullException(nameof(trackMapViewModel));
         DriverTable = new DriverTableViewModel();
         Telemetry = new TelemetryViewModel();
         SessionFinder = sessionFinderViewModel ?? throw new ArgumentNullException(nameof(sessionFinderViewModel));
@@ -41,6 +37,7 @@ public class MainViewModel : BindableBase, IDisposable
         Playback.PositionChanged += OnPlaybackPositionChanged;
         SessionFinder.SessionSelected += OnSessionSelected;
         DriverTable.SelectedDriverChanged += OnSelectedDriverChanged;
+        _bufferController.BufferingCompleted += OnBufferingCompleted;
 
         LoadReplayCommand = new AsyncRelayCommand(
             LoadReplayAsync,
@@ -110,28 +107,28 @@ public class MainViewModel : BindableBase, IDisposable
         }
 
         _isDisposed = true;
+        CancelReplayLoad();
+        _bufferController.ClearSession();
         Playback.PositionChanged -= OnPlaybackPositionChanged;
-        DriverTable.SelectedDriverChanged -= OnSelectedDriverChanged;
         SessionFinder.SessionSelected -= OnSessionSelected;
+        DriverTable.SelectedDriverChanged -= OnSelectedDriverChanged;
+        _bufferController.BufferingCompleted -= OnBufferingCompleted;
         Playback.Dispose();
         Telemetry.Dispose();
     }
 
     private async Task LoadReplayAsync()
     {
-        if (!TryParseSessionKey(
-            SessionKeyText,
-            out SessionKey sessionKey,
-            out string? errorMessage))
+        if (!TryParseSessionKey(SessionKeyText, out SessionKey sessionKey, out string? errorMessage))
         {
             StatusText = errorMessage ?? "Session key is invalid.";
             return;
         }
 
-        await LoadReplayAsync(sessionKey, SessionKeyText.Trim(), CancellationToken.None);
+        await LoadReplayAsync(sessionKey, SessionKeyText.Trim());
     }
 
-    private async Task LoadReplayAsync(SessionKey sessionKey, string sessionDescription, CancellationToken cancellationToken)
+    private async Task LoadReplayAsync(SessionKey sessionKey, string sessionDescription)
     {
         if (IsLoading)
         {
@@ -139,15 +136,22 @@ public class MainViewModel : BindableBase, IDisposable
         }
 
         ClearReplay();
+        CancellationTokenSource cancellationTokenSource = new();
+        _replayCancellationTokenSource = cancellationTokenSource;
 
         try
         {
             IsLoading = true;
             StatusText = $"Loading OpenF1 data for {sessionDescription}...";
 
-            ReplayLoadResult result = await _replayLoader.LoadInitialAsync(sessionKey);
-            await LoadReplay(result, cancellationToken);
+            ReplayLoadResult result = await _replayLoader.LoadInitialAsync(sessionKey, cancellationTokenSource.Token);
+
+            await LoadReplayAsync(result, cancellationTokenSource.Token);
             StatusText = BuildLoadedStatus(result);
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+            StatusText = "Replay loading was cancelled.";
         }
         catch (Exception exception)
         {
@@ -155,127 +159,52 @@ public class MainViewModel : BindableBase, IDisposable
         }
         finally
         {
+            if (ReferenceEquals(_replayCancellationTokenSource, cancellationTokenSource))
+            {
+                _replayCancellationTokenSource = null;
+            }
+
+            cancellationTokenSource.Dispose();
             IsLoading = false;
         }
+    }
+    private async Task LoadReplayAsync(ReplayLoadResult result, CancellationToken cancellationToken)
+    {
+        _timeline = result.Timeline;
+        await TrackMap.InitialiseAsync(result.Data, cancellationToken);
+        DriverTable.Initialise(result.Data.Drivers);
+        Playback.Load(result.Timeline);
+        _bufferController.StartSession();
     }
 
     private void OnSessionSelected(SessionFinderSession session)
     {
         SessionKeyText = session.SessionKey.Value.ToString();
         IsSessionFinderOpen = false;
-        _ = LoadReplayAsync(session.SessionKey, session.SessionName, CancellationToken.None);
-    }
-    private async Task LoadReplay(ReplayLoadResult result, CancellationToken cancellationToken)
-    {
-        _timeline = result.Timeline;
-
-        string TrackName =
-            result.Data.Meeting!.CircuitShortName ??
-            result.Data.Session.CircuitShortName ??
-            result.Data.Meeting.MeetingName ??
-            result.Data.Session.Location ??
-            "Track map";
-
-        IReadOnlyList<OpenF1Lap> mapLaps = result.Data.Session.SessionType == SessionType.Qualifying
-            ? result.Data.Laps
-            : await _sessionData.GetQualifyingLapsAsync(
-                result.Data.Session.MeetingKey,
-                cancellationToken);
-
-        if (mapLaps.Count == 0)
-        {
-            Debug.WriteLine("No normal qualifying session was found; using the replay session for the track map.");
-            mapLaps = result.Data.Laps;
-        }
-
-        IReadOnlyList<OpenF1Location> mapLocations = await LoadTrackMapLocationsAsync(mapLaps, cancellationToken);
-
-        TrackMap.Init(
-            TrackName,
-            result.Data.Drivers,
-            mapLocations);
-
-        DriverTable.Init(result.Data.Drivers);
-        Playback.Load(result.Timeline);
+        _ = LoadReplayAsync(session.SessionKey, session.SessionName);
     }
 
-    private async Task<IReadOnlyList<OpenF1Location>> LoadTrackMapLocationsAsync(IReadOnlyList<OpenF1Lap> laps, CancellationToken cancellationToken)
-    {
-        IReadOnlyList<OpenF1Location>? fallbackLocations = null;
-
-        foreach (OpenF1Lap lap in laps
-            .Where(lap =>
-                lap.TimestampStart.HasValue &&
-                lap.LapDuration is >= MinimumTrackMapLapDurationSeconds and <= MaximumTrackMapLapDurationSeconds &&
-                lap.IsPitOutLap is not true)
-            .OrderBy(lap => lap.LapDuration)
-            .Take(TrackMapCandidateLapCount))
-        {
-            IReadOnlyList<OpenF1Location> locations = await _sessionData.GetLapLocationsAsync(lap, cancellationToken);
-
-            fallbackLocations ??= locations;
-
-            int coordinateCount = locations
-                .Where(location => location.X.HasValue && location.Y.HasValue)
-                .Select(location => (location.X!.Value, location.Y!.Value))
-                .Distinct()
-                .Count();
-
-            if (coordinateCount >= MinimumTrackMapCoordinateCount)
-            {
-                Debug.WriteLine(
-                    $"Selected track-map lap {lap.LapNumber.Value} for driver {lap.DriverNumber.Value}: " +
-                    $"{coordinateCount} distinct coordinates.");
-
-                return locations;
-            }
-
-            Debug.WriteLine(
-                $"Rejected track-map lap {lap.LapNumber.Value} for driver {lap.DriverNumber.Value}: " +
-                $"only {coordinateCount} distinct coordinates.");
-        }
-
-        return fallbackLocations ?? throw new InvalidOperationException("No suitable completed lap was found to build the track map.");
-    }
-    private async Task BufferNextChunkAsync(TimeSpan chunkLength)
-    {
-        if (!CanBufferNextChunk() || _timeline is not ReplayTimeline timeline)
-        {
-            return;
-        }
-
-        _isBuffering = true;
-        StatusText = $"Buffering the next chunk. Size: {chunkLength.TotalMinutes} minute[s]";
-
-        try
-        {
-            await _replayLoader.LoadNextChunkAsync(timeline, chunkLength);
-            Playback.RefreshBufferedDuration();
-            Playback.ResumeAfterBuffering();
-            StatusText = $"Buffered {timeline.BufferedDuration:hh\\:mm\\:ss} of {timeline.Duration:hh\\:mm\\:ss}.";
-        }
-        catch (Exception exception)
-        {
-            StatusText = $"Buffering failed: {exception.Message}";
-        }
-        finally
-        {
-            _isBuffering = false;
-        }
-    }
     private void ClearReplay()
     {
+        CancelReplayLoad();
+        _bufferController.ClearSession();
         _timeline = null;
-        _lastAutoBufferAttemptedEnd = null;
         Playback.Clear();
         DriverTable.Clear();
         TrackMap.Clear();
         Telemetry.SelectDriver(null);
     }
 
-    private void OnPlaybackPositionChanged(
-        object? sender,
-        PlaybackPositionChangedEventArgs eventArgs)
+    private void CancelReplayLoad()
+    {
+        if(_replayCancellationTokenSource is not null)
+        {
+            _replayCancellationTokenSource!.Cancel();
+            _replayCancellationTokenSource = null;
+        }
+    }
+
+    private void OnPlaybackPositionChanged(object? sender, PlaybackPositionChangedEventArgs eventArgs)
     {
         if (_timeline is not ReplayTimeline timeline)
         {
@@ -286,32 +215,36 @@ public class MainViewModel : BindableBase, IDisposable
             timeline,
             eventArgs.Position,
             Playback.IsPlaying);
+
         TrackMap.Update(timeline, eventArgs.Position);
-        TryAutoBuffer(timeline, eventArgs.Position);
+
+        if (_bufferController.BufferAheadIfNeeded(
+            timeline,
+            eventArgs.Position,
+            Playback.IsPlaying))
+        {
+            StatusText = "Buffering the next replay chunk...";
+        }
     }
 
-    private void TryAutoBuffer(ReplayTimeline timeline, TimeSpan playheadPosition)
+    private void OnBufferingCompleted(object? sender, ReplayBufferCompletedEventArgs eventArgs)
     {
-        if (!Playback.IsPlaying || !CanBufferNextChunk())
+        if (!ReferenceEquals(_timeline, eventArgs.Timeline))
         {
             return;
         }
 
-        TimeSpan remainingBufferedTime = timeline.BufferedDuration - playheadPosition;
-
-        if (remainingBufferedTime > AutoBufferThreshold || _lastAutoBufferAttemptedEnd == timeline.BufferedDuration)
+        if (!eventArgs.Succeeded)
         {
+            StatusText = $"Buffering failed: {eventArgs.Failure!.Message}";
             return;
         }
 
-        _lastAutoBufferAttemptedEnd = timeline.BufferedDuration;
-        _ = BufferNextChunkAsync(BufferChunkLength);
+        Playback.RefreshBufferedDuration();
+        Playback.ResumeAfterBuffering();
+        StatusText = $"Buffered {_timeline.BufferedDuration:hh\\:mm\\:ss} of " + $"{_timeline.Duration:hh\\:mm\\:ss}.";
     }
 
-    private bool CanBufferNextChunk()
-    {
-        return !IsLoading && !_isBuffering && _timeline is { BufferedDuration: var buffered, Duration: var duration } && buffered < duration;
-    }
     private void OnSelectedDriverChanged(object? sender, EventArgs eventArgs)
     {
         ReplayDriverRow? selectedDriver = DriverTable.SelectedDriver;
@@ -340,10 +273,7 @@ public class MainViewModel : BindableBase, IDisposable
             $"Private memory: {ToMb(process.PrivateMemorySize64):0.0} MB";
     }
 
-    private static bool TryParseSessionKey(
-        string text,
-        out SessionKey sessionKey,
-        out string? errorMessage)
+    private static bool TryParseSessionKey(string text, out SessionKey sessionKey, out string? errorMessage)
     {
         string trimmed = text.Trim();
 

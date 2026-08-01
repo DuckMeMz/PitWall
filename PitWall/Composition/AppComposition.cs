@@ -1,4 +1,5 @@
-﻿using PitWall.Services;
+﻿using PitWall.Models;
+using PitWall.Services;
 using PitWall.ViewModels;
 using System.Net.Http;
 
@@ -16,11 +17,20 @@ public static class AppComposition
         SessionCatalogService sessionCatalog = new(openF1Client);
         SessionDataService sessionData = new(openF1Client);
 
+        ReplayBufferSettings replayBufferSettings = new();
+        TrackMapSettings trackMapSettings = new();
         ReplayBuilder replayBuilder = new();
-        ReplayLoader replayLoader = new(sessionData, replayBuilder);
+        ReplayLoader replayLoader = new(sessionData, replayBuilder, replayBufferSettings);
+        BufferController replayBufferCoordinator = new(replayLoader, replayBufferSettings);
+        TrackMapLoader trackMapLoader = new(sessionData, trackMapSettings);
 
+        TrackMapViewModel trackMapViewModel = new(trackMapLoader);
         SessionFinderViewModel sessionFinderViewModel = new(sessionCatalog);
 
-        return new MainViewModel(replayLoader, sessionData, sessionFinderViewModel);
+        return new MainViewModel(
+            replayLoader,
+            replayBufferCoordinator,
+            trackMapViewModel,
+            sessionFinderViewModel);
     }
 }

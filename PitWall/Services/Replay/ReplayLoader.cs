@@ -7,21 +7,25 @@ public class ReplayLoader
 {
     private readonly SessionDataService _sessionDataService;
     private readonly ReplayBuilder _replayBuilder;
-    private readonly TimeSpan _initialChunkLength = TimeSpan.FromMinutes(1);
+    private readonly ReplayBufferSettings _settings;
 
-    public ReplayLoader(SessionDataService sessionDataService, ReplayBuilder replayBuilder)
+    public ReplayLoader(
+        SessionDataService sessionDataService,
+        ReplayBuilder replayBuilder,
+        ReplayBufferSettings settings)
     {
-        _sessionDataService = sessionDataService
-            ?? throw new ArgumentNullException(nameof(sessionDataService));
-        _replayBuilder = replayBuilder
-            ?? throw new ArgumentNullException(nameof(replayBuilder));
+        _sessionDataService = sessionDataService ?? throw new ArgumentNullException(nameof(sessionDataService));
+        _replayBuilder = replayBuilder ?? throw new ArgumentNullException(nameof(replayBuilder));
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     }
 
     public async Task<ReplayLoadResult> LoadInitialAsync(SessionKey sessionKey, CancellationToken cancellationToken = default)
     {
         Stopwatch loadTimer = Stopwatch.StartNew();
-        InitialReplayData initialReplayData =
-            await _sessionDataService.LoadInitialReplayChunk(sessionKey, _initialChunkLength, cancellationToken);
+        InitialReplayData initialReplayData = await _sessionDataService.LoadInitialReplayChunk(
+            sessionKey, 
+            _settings.InitialChunkLength, 
+            cancellationToken);
 
         Stopwatch buildTimer = Stopwatch.StartNew();
         ReplayTimeline timeline = _replayBuilder.BuildInitialTimeline(initialReplayData);

@@ -11,10 +11,16 @@ public class TrackMapViewModel : BindableBase
 {
     private static readonly TimeSpan MarkerStaleAfter = TimeSpan.FromSeconds(30);
 
+    private readonly TrackMapLoader _trackMapLoader;
     private readonly Dictionary<DriverNumber, ReplayMapMarker> _markersByDriver = new();
     private TrackMapProjector _projector = TrackMapProjector.Empty;
     private string _trackTitle = "No session loaded";
     private PointCollection _trackPath = new();
+
+    public TrackMapViewModel(TrackMapLoader trackMapLoader)
+    {
+        _trackMapLoader = trackMapLoader ?? throw new ArgumentNullException(nameof(trackMapLoader));
+    }
 
     public ObservableCollection<ReplayMapMarker> MapMarkers { get; } = new();
 
@@ -30,14 +36,18 @@ public class TrackMapViewModel : BindableBase
         private set => SetProperty(ref _trackPath, value);
     }
 
-    public void Init(string trackTitle, IReadOnlyList<OpenF1Driver> drivers, IReadOnlyList<OpenF1Location> circuitLocations)
+    public async Task InitialiseAsync(InitialReplayData replayData, CancellationToken cancellationToken = default)
     {
-        Clear();
-        _projector = TrackMapProjector.FromLocations(circuitLocations);
-        TrackTitle = trackTitle;
-        TrackMapPath = BuildTrackPath(circuitLocations);
+        ArgumentNullException.ThrowIfNull(replayData);
 
-        foreach (OpenF1Driver driver in drivers
+        Clear();
+        TrackMapData mapData = await _trackMapLoader.LoadAsync(replayData, cancellationToken);
+
+        _projector = TrackMapProjector.FromLocations(mapData.CircuitLocations);
+        TrackTitle = mapData.Title;
+        TrackMapPath = BuildTrackPath(mapData.CircuitLocations);
+
+        foreach (OpenF1Driver driver in replayData.Drivers
             .OrderBy(driver => driver.DriverNumber.Value))
         {
             ReplayMapMarker marker = new(driver);
@@ -130,5 +140,4 @@ public class TrackMapViewModel : BindableBase
         path.Freeze();
         return path;
     }
-
 }
