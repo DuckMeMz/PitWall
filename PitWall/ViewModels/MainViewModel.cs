@@ -40,7 +40,7 @@ public class MainViewModel : BindableBase, IDisposable
         _bufferController.BufferingCompleted += OnBufferingCompleted;
 
         LoadReplayCommand = new AsyncRelayCommand(
-            LoadReplayAsync,
+            LoadReplayFromSessionKeyFieldAsync,
             () => !IsLoading);
 
         OpenSessionFinderCommand = new RelayCommand(() => IsSessionFinderOpen = true);
@@ -117,7 +117,7 @@ public class MainViewModel : BindableBase, IDisposable
         Telemetry.Dispose();
     }
 
-    private async Task LoadReplayAsync()
+    private async Task LoadReplayFromSessionKeyFieldAsync()
     {
         if (!TryParseSessionKey(SessionKeyText, out SessionKey sessionKey, out string? errorMessage))
         {
@@ -130,11 +130,6 @@ public class MainViewModel : BindableBase, IDisposable
 
     private async Task LoadReplayAsync(SessionKey sessionKey, string sessionDescription)
     {
-        if (IsLoading)
-        {
-            return;
-        }
-
         ClearReplay();
         CancellationTokenSource cancellationTokenSource = new();
         _replayCancellationTokenSource = cancellationTokenSource;
@@ -146,32 +141,54 @@ public class MainViewModel : BindableBase, IDisposable
 
             ReplayLoadResult result = await _replayLoader.LoadInitialAsync(sessionKey, cancellationTokenSource.Token);
 
-            await LoadReplayAsync(result, cancellationTokenSource.Token);
+            if (!IsCurrentReplayLoad(cancellationTokenSource))
+            {
+                return;
+            }
+
+            await InitialiseLoadedReplayAsync(result, cancellationTokenSource.Token);
+
+            if (!IsCurrentReplayLoad(cancellationTokenSource))
+            {
+                return;
+            }
+
             StatusText = BuildLoadedStatus(result);
         }
         catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
         {
-            StatusText = "Replay loading was cancelled.";
+            if (IsCurrentReplayLoad(cancellationTokenSource))
+            {
+                StatusText = "Replay loading was cancelled.";
+            }
         }
         catch (Exception exception)
         {
-            StatusText = $"Replay load failed: {exception.Message}";
+            if (IsCurrentReplayLoad(cancellationTokenSource))
+            {
+                StatusText = $"Replay load failed: {exception.Message}";
+            }
         }
         finally
         {
-            if (ReferenceEquals(_replayCancellationTokenSource, cancellationTokenSource))
+            if (IsCurrentReplayLoad(cancellationTokenSource))
             {
                 _replayCancellationTokenSource = null;
+                IsLoading = false;
             }
 
             cancellationTokenSource.Dispose();
-            IsLoading = false;
         }
     }
-    private async Task LoadReplayAsync(ReplayLoadResult result, CancellationToken cancellationToken)
+    private async Task InitialiseLoadedReplayAsync(ReplayLoadResult result, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         _timeline = result.Timeline;
+
         await TrackMap.InitialiseAsync(result.Data, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
         DriverTable.Initialise(result.Data.Drivers);
         Playback.Load(result.Timeline);
         _bufferController.StartSession();
@@ -202,6 +219,11 @@ public class MainViewModel : BindableBase, IDisposable
             _replayCancellationTokenSource!.Cancel();
             _replayCancellationTokenSource = null;
         }
+    }
+
+    private bool IsCurrentReplayLoad(CancellationTokenSource cancellationTokenSource)
+    {
+        return ReferenceEquals(_replayCancellationTokenSource, cancellationTokenSource);
     }
 
     private void OnPlaybackPositionChanged(object? sender, PlaybackPositionChangedEventArgs eventArgs)
