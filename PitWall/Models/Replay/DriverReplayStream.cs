@@ -227,7 +227,7 @@ public class DriverReplayStream
             samples,
             timestamp,
             location => location.Timestamp,
-            TimeSpan.MaxValue,
+            TimeSpan.FromSeconds(2),
             out OpenF1Location? previous,
             out OpenF1Location? next,
             out double amount))
