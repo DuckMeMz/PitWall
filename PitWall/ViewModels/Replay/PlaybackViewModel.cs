@@ -163,9 +163,14 @@ public class PlaybackViewModel : BindableBase, IDisposable
         OnPropertyChanged(nameof(BufferedSeconds));
     }
 
+    public void RefreshCurrentPosition()
+    {
+        ApplyPosition(TimeSpan.FromSeconds(CurrentTimeSeconds), true);
+    }
+
     public void ResumeAfterBuffering()
     {
-        if (!_resumeWhenBuffered || !HasReplay || CurrentTimeSeconds >= BufferedSeconds)
+        if (!_resumeWhenBuffered || !HasReplay || !_timeline!.IsTimeBuffered(TimeSpan.FromSeconds(CurrentTimeSeconds)))
         {
             return;
         }
@@ -213,6 +218,14 @@ public class PlaybackViewModel : BindableBase, IDisposable
         OnPropertyChanged(nameof(ScrubTimeSeconds));
     }
 
+    public void WaitForBuffer(bool resumeWhenBuffered)
+    {
+        StopRendering();
+        _playbackClock.Stop();
+        _resumeWhenBuffered = resumeWhenBuffered;
+        IsPlaying = false;
+    }
+
     private bool HasReplay => _timeline is not null && _timeline.DriverCount > 0;
 
     private void TogglePlayback()
@@ -249,10 +262,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
 
     private void PauseForBuffer()
     {
-        StopRendering();
-        _playbackClock.Stop();
-        _resumeWhenBuffered = true;
-        IsPlaying = false;
+        WaitForBuffer(resumeWhenBuffered: true);
     }
 
     private void StartRendering()
@@ -279,23 +289,25 @@ public class PlaybackViewModel : BindableBase, IDisposable
 
     private void OnRendering(object? sender, EventArgs e)
     {
+        if (_timeline is not ReplayTimeline timeline)
+        {
+            return;
+        }
+
         TimeSpan scaledElapsed = TimeSpan.FromTicks((long)(_playbackClock.Elapsed.Ticks * PlaybackSpeed));
         TimeSpan targetTime = _playbackStartTime + scaledElapsed;
-        TimeSpan bufferedDuration = _timeline?.BufferedDuration ?? TimeSpan.Zero;
 
-        if (targetTime >= bufferedDuration)
+        if (targetTime >= timeline.Duration)
         {
-            SeekTo(bufferedDuration, resetPlaybackClock: false);
+            SeekTo(timeline.Duration, resetPlaybackClock: false);
+            Pause();
+            return;
+        }
 
-            if(bufferedDuration == _timeline!.Duration)
-            {
-                Pause();
-            }
-            else
-            {
-                PauseForBuffer();
-            }
-
+        if (!timeline.IsTimeBuffered(targetTime))
+        {
+            SeekTo(targetTime, resetPlaybackClock: false);
+            PauseForBuffer();
             return;
         }
 

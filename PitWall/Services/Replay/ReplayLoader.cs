@@ -49,7 +49,8 @@ public class ReplayLoader
     {
         ArgumentNullException.ThrowIfNull(timeline);
 
-        TimeSpan remainingDuration = timeline.Duration - timeline.BufferedDuration;
+        DateTimeOffset sessionEnd = timeline.SessionStart + timeline.Duration;
+        TimeSpan remainingDuration = sessionEnd - chunkStart;
 
         if (remainingDuration <= TimeSpan.Zero)
         {

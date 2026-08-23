@@ -54,7 +54,7 @@ public class BufferController
             return false;
         }
 
-        TimeSpan remainingBufferedTime = timeline.BufferedDuration - playbackPosition;
+        TimeSpan remainingBufferedTime = range.End - playbackTime;
 
         if (remainingBufferedTime > _settings.AutoBufferThreshold)
         {

@@ -95,6 +95,12 @@ public class ReplayTimeline
         return DriverStreams[driverIndex];
     }
 
+    public bool IsTimeBuffered(TimeSpan time)
+    {
+        DateTimeOffset dateTime = SessionStart + time;
+        return IsTimeBuffered(dateTime);
+    }
+
     public bool IsTimeBuffered(DateTimeOffset time)
     {
         foreach(ReplayBufferRange range in LoadedRanges)

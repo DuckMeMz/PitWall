@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 using PitWall.Commands;
 using PitWall.Common;
 using PitWall.Models;
@@ -233,6 +234,20 @@ public class MainViewModel : BindableBase, IDisposable
             return;
         }
 
+        DateTimeOffset playbackTime = timeline.SessionStart + eventArgs.Position;
+
+        if(!timeline.IsTimeBuffered(playbackTime))
+        {
+            Playback.WaitForBuffer(resumeWhenBuffered: Playback.IsPlaying);
+
+            if(_bufferController.BufferAt(timeline, eventArgs.Position))
+            {
+                StatusText = "Buffering selected replay time...";
+            }
+
+            return;
+        }
+
         DriverTable.Update(
             timeline,
             eventArgs.Position,
@@ -263,6 +278,7 @@ public class MainViewModel : BindableBase, IDisposable
         }
 
         Playback.RefreshBufferedDuration();
+        Playback.RefreshCurrentPosition();
         Playback.ResumeAfterBuffering();
         StatusText = $"Buffered {_timeline.BufferedDuration:hh\\:mm\\:ss} of " + $"{_timeline.Duration:hh\\:mm\\:ss}.";
     }
