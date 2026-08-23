@@ -37,38 +37,76 @@ public class BufferController
     {
         ArgumentNullException.ThrowIfNull(timeline);
 
-        if (!isPlaying ||
-            _isBuffering ||
-            timeline.BufferedDuration >= timeline.Duration)
+        if (!isPlaying || _isBuffering)
+        {
+            return false;
+        }
+
+        DateTimeOffset playbackTime = timeline.SessionStart + playbackPosition;
+
+        if(!timeline.TryGetBufferedRange(playbackTime, out ReplayBufferRange? range))
+        {
+            return false;
+        }
+
+        if(range!.End >= timeline.SessionStart + timeline.Duration)
         {
             return false;
         }
 
         TimeSpan remainingBufferedTime = timeline.BufferedDuration - playbackPosition;
 
-        if (remainingBufferedTime > _settings.AutoBufferThreshold || 
-            _lastAttemptedBufferEnd == timeline.BufferedDuration)
+        if (remainingBufferedTime > _settings.AutoBufferThreshold)
         {
             return false;
         }
 
-        _lastAttemptedBufferEnd = timeline.BufferedDuration;
+        return StartBuffering(timeline, range.End);
+    }
+
+    public bool BufferAt(ReplayTimeline timeline, TimeSpan requestedPosition)
+    {
+        DateTimeOffset requestedTime = timeline.SessionStart + requestedPosition;
+
+        if(timeline.IsTimeBuffered(requestedTime))
+        {
+            return false;
+        }
+
+        DateTimeOffset chunkStart = requestedTime - _settings.PreBufferSize;
+
+        if(chunkStart < timeline.SessionStart)
+        {
+            chunkStart = timeline.SessionStart;
+        }
+
+        return StartBuffering(timeline, chunkStart);
+    }
+
+    private bool StartBuffering(ReplayTimeline timeline, DateTimeOffset chunkStart)
+    {
+        if(_isBuffering)
+        {
+            return false;
+        }
+
         _isBuffering = true;
 
         CancellationToken cancellationToken = _cancellationTokenSource?.Token ?? CancellationToken.None;
 
-        _ = BufferNextChunkAsync(timeline, cancellationToken);
+        _ = BufferChunkAsync(timeline, chunkStart, cancellationToken);
         return true;
     }
 
-    private async Task BufferNextChunkAsync(ReplayTimeline timeline, CancellationToken cancellationToken)
+    private async Task BufferChunkAsync(ReplayTimeline timeline, DateTimeOffset chunkStart, CancellationToken cancellationToken)
     {
         Exception? failure = null;
 
         try
         {
-            await _replayLoader.LoadNextChunkAsync(
+            await _replayLoader.LoadChunkAsync(
                 timeline,
+                chunkStart,
                 _settings.NextChunkLength,
                 cancellationToken);
         }
