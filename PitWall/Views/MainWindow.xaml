@@ -118,10 +118,13 @@
                     <Slider
                         Minimum="0"
                         Maximum="{Binding Playback.DurationSeconds}"
-                        Value="{Binding Playback.CurrentTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        Value="{Binding Playback.ScrubTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         Style="{StaticResource PlaybackSliderStyle}"
                         Panel.ZIndex="1"
                         VerticalAlignment="Center"
+                        PreviewMouseLeftButtonDown="OnPlaybackSliderMouseDown"
+                        PreviewMouseLeftButtonUp="OnPlaybackSliderMouseUp"
+                        LostMouseCapture="OnPlaybackSliderLostMouseCapture"
                         d:Value="2" />
 
                 </Grid>

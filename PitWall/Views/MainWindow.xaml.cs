@@ -1,6 +1,7 @@
 using PitWall.ViewModels;
 using PitWall.Composition;
 using System.Windows;
+using System.Windows.Input;
 
 namespace PitWall
 {
@@ -27,6 +28,21 @@ namespace PitWall
         {
             _viewModel.Dispose();
             base.OnClosed(e);
+        }
+
+        private void OnPlaybackSliderMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _viewModel.Playback.BeginScrubbing();
+        }
+
+        private void OnPlaybackSliderMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            _viewModel.Playback.CommitScrub();
+        }
+
+        private void OnPlaybackSliderLostMouseCapture(object sender, MouseEventArgs e)
+        {
+            _viewModel.Playback.CommitScrub();
         }
     }
 }

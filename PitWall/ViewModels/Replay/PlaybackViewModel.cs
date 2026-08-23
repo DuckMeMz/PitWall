@@ -21,6 +21,9 @@ public class PlaybackViewModel : BindableBase, IDisposable
     private bool _isEnabled = true;
     private bool _isRendering;
     private bool _isDisposed;
+    private bool _isScrubbing;
+    private double _scrubTimeSeconds;
+
 
     public PlaybackViewModel()
     {
@@ -44,6 +47,24 @@ public class PlaybackViewModel : BindableBase, IDisposable
             {
                 SeekTo(TimeSpan.FromSeconds(clampedValue), resetPlaybackClock: true);
             }
+        }
+    }
+
+    public double ScrubTimeSeconds
+    {
+        get => _isScrubbing ? _scrubTimeSeconds : CurrentTimeSeconds;
+
+        set
+        {
+            double clampedValue = ClampTimeSeconds(value);
+
+            if(_isScrubbing)
+            {
+                SetProperty(ref _scrubTimeSeconds, clampedValue);
+                return;
+            }
+
+            CurrentTimeSeconds = clampedValue;
         }
     }
 
@@ -171,6 +192,25 @@ public class PlaybackViewModel : BindableBase, IDisposable
         _isDisposed = true;
         StopRendering();
         _playbackClock.Stop();
+    }
+
+    public void BeginScrubbing()
+    {
+        _isScrubbing = true;
+        _scrubTimeSeconds = CurrentTimeSeconds;
+    }
+
+    public void CommitScrub()
+    {
+        if(!_isScrubbing)
+        {
+            return;
+        }
+
+        _isScrubbing = false;
+
+        CurrentTimeSeconds = _scrubTimeSeconds;
+        OnPropertyChanged(nameof(ScrubTimeSeconds));
     }
 
     private bool HasReplay => _timeline is not null && _timeline.DriverCount > 0;
