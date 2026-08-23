@@ -11,7 +11,7 @@ public record ReplayBufferRange(
 
     public bool Contains(DateTimeOffset time)                        
     {
-        return Start <= time && End >= time;
+        return Start <= time && time < End;
     }
 
     public bool TouchesOrOverlaps(ReplayBufferRange otherRange)
