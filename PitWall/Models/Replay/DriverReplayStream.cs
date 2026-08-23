@@ -1,4 +1,6 @@
+using Microsoft.VisualBasic;
 using PitWall.Models.OpenF1Api;
+using System.Globalization;
 
 namespace PitWall.Models;
 
@@ -60,6 +62,29 @@ public class DriverReplayStream
         }
     }
 
+    public void MergeStream(
+        IEnumerable<OpenF1Location> newLocations,
+        IEnumerable<OpenF1CarTelemetrySample> newCarTelemetry,
+        IEnumerable<OpenF1IntervalSample> newIntervals,
+        IEnumerable<OpenF1PositionUpdate> newPositions)
+    {
+        ArgumentNullException.ThrowIfNull(newLocations);
+        ArgumentNullException.ThrowIfNull(newCarTelemetry);
+        ArgumentNullException.ThrowIfNull(newIntervals);
+        ArgumentNullException.ThrowIfNull(newPositions);
+
+        MergeSamples(
+            Locations,
+            newLocations.Where(location => location.X.HasValue && location.Y.HasValue),
+            location => location.Timestamp);
+
+        MergeSamples(Telemetry, newCarTelemetry, sample => sample.Timestamp);
+        MergeSamples(Intervals, newIntervals, sample => sample.Timestamp);
+        MergeSamples(Positions, newPositions, sample => sample.Timestamp);
+
+        _locationLastMovementTimestamps = BuildLocationLastMovementTimestamps(Locations);
+    }
+
     private static int AppendSamples<T>(
         List<T> existingSamples,
         IEnumerable<T> newSamples,
@@ -100,6 +125,25 @@ public class DriverReplayStream
         existingSamples.AddRange(orderedNewSamples.Skip(firstNewIndex));
         return firstChangedIndex;
     }
+
+    private static void MergeSamples<T>(
+        List<T> existingSamples,
+        IEnumerable<T> newSamples,
+        Func<T, DateTimeOffset?> getTimestamp)
+        where T : class
+    {
+        List<T> mergedSamples = existingSamples
+            .Concat(newSamples)
+            .Where(sample => getTimestamp(sample).HasValue)
+            .GroupBy(sample => getTimestamp(sample)!.Value)
+            .OrderBy(group => group.Key)
+            .Select(group => group.Last())
+            .ToList();
+
+        existingSamples.Clear();
+        existingSamples.AddRange(mergedSamples);
+    }
+
     private static List<T> NormalizeSamplesIntoList<T>(
         IEnumerable<T> samples,
         Func<T, DateTimeOffset?> getTimestamp)
@@ -171,19 +215,20 @@ public class DriverReplayStream
             _locationLastMovementTimestamps[i] = lastMovementTimestamp;
         }
     }
-    public DriverReplayState GetStateAt(DateTimeOffset timestamp)
+    public DriverReplayState GetStateAt(DateTimeOffset timestamp, DateTimeOffset rangeStart)
     {
         
         return new DriverReplayState(
             DriverNumber,
-            Position: SampleLatest(Positions, timestamp, position => position.Timestamp)?.Position,
+            Position: SampleLatest(Positions, timestamp, position => position.Timestamp, rangeStart)?.Position,
             Location: SampleInterpolatedLocation(
                 Locations,
                 _locationLastMovementTimestamps,
-                timestamp),
-            Telemetry: SampleInterpolatedTelemetry(Telemetry, timestamp),
-            Interval: SampleInterpolatedInterval(Intervals, timestamp),
-            CurrentLap: SampleLatest(Laps, timestamp, lap => lap.TimestampStart),
+                timestamp,
+                rangeStart),
+            Telemetry: SampleInterpolatedTelemetry(Telemetry, timestamp, rangeStart),
+            Interval: SampleInterpolatedInterval(Intervals, timestamp, rangeStart),
+            CurrentLap: SampleLatest(Laps, timestamp, lap => lap.TimestampStart, rangeStart),
             CurrentStint: null,
             CurrentPitStop: null);
     }
@@ -191,18 +236,25 @@ public class DriverReplayStream
     private static T? SampleLatest<T>(
         IReadOnlyList<T> samples,
         DateTimeOffset timestamp,
-        Func<T, DateTimeOffset?> getTimestamp)
+        Func<T, DateTimeOffset?> getTimestamp,
+        DateTimeOffset rangeStart)
         where T : class
     {
         int index = FindLatestIndexAtOrBefore(samples, timestamp, getTimestamp);
 
-        return index >= 0 ? samples[index] : null;
+        if(index < 0 || getTimestamp(samples[index]) < rangeStart)
+        {
+            return null;
+        }
+
+        return samples[index];
     }
 
     private static ReplayLocation? SampleInterpolatedLocation(
         IReadOnlyList<OpenF1Location> samples,
         IReadOnlyList<DateTimeOffset> lastMovementTimestamps,
-        DateTimeOffset timestamp)
+        DateTimeOffset timestamp,
+        DateTimeOffset rangeStart)
     {
         int latestIndex = FindLatestIndexAtOrBefore(
             samples,
@@ -228,6 +280,7 @@ public class DriverReplayStream
             timestamp,
             location => location.Timestamp,
             TimeSpan.FromSeconds(2),
+            rangeStart,
             out OpenF1Location? previous,
             out OpenF1Location? next,
             out double amount))
@@ -252,19 +305,20 @@ public class DriverReplayStream
 
     private static ReplayTelemetry? SampleInterpolatedTelemetry(
         IReadOnlyList<OpenF1CarTelemetrySample> samples,
-        DateTimeOffset timestamp)
+        DateTimeOffset timestamp,
+        DateTimeOffset rangeStart)
     {
         if (!TryGetInterpolationSamples(
             samples,
             timestamp,
             sample => sample.Timestamp,
             TimeSpan.FromSeconds(1),
+            rangeStart,
             out OpenF1CarTelemetrySample? previous,
             out OpenF1CarTelemetrySample? next,
             out double amount))
         {
-            OpenF1CarTelemetrySample? latest =
-                SampleLatest(samples, timestamp, sample => sample.Timestamp);
+            OpenF1CarTelemetrySample? latest = SampleLatest(samples, timestamp, sample => sample.Timestamp, rangeStart);
 
             OpenF1CarTelemetrySample sample = latest ?? samples[0];
 
@@ -288,19 +342,20 @@ public class DriverReplayStream
 
     private static ReplayInterval? SampleInterpolatedInterval(
         IReadOnlyList<OpenF1IntervalSample> samples,
-        DateTimeOffset timestamp)
+        DateTimeOffset timestamp,
+        DateTimeOffset rangeStart)
     {
         if (!TryGetInterpolationSamples(
             samples,
             timestamp,
             sample => sample.Timestamp,
             TimeSpan.FromSeconds(7.5),
+            rangeStart,
             out OpenF1IntervalSample? previous,
             out OpenF1IntervalSample? next,
             out double amount))
         {
-            OpenF1IntervalSample? latest =
-                SampleLatest(samples, timestamp, sample => sample.Timestamp);
+            OpenF1IntervalSample? latest = SampleLatest(samples, timestamp, sample => sample.Timestamp, rangeStart);
 
             return latest is null
                 ? null
@@ -344,6 +399,7 @@ public class DriverReplayStream
         DateTimeOffset timestamp,
         Func<T, DateTimeOffset?> getTimestamp,
         TimeSpan maxInterpolationGap,
+        DateTimeOffset rangeStart,
         out T? previous,
         out T? next,
         out double amount)
@@ -367,6 +423,11 @@ public class DriverReplayStream
         DateTimeOffset? nextTimestamp = getTimestamp(next);
 
         if(previousTimestamp is null || nextTimestamp is null)
+        {
+            return false;
+        }
+
+        if(previousTimestamp < rangeStart)
         {
             return false;
         }

@@ -41,6 +41,12 @@ public class ReplayLoader
 
     public async Task LoadNextChunkAsync(ReplayTimeline timeline, TimeSpan chunkLength, CancellationToken cancellationToken = default)
     {
+        DateTimeOffset chunkStart = timeline.SessionStart + timeline.BufferedDuration;
+        await LoadChunkAsync(timeline, chunkStart, chunkLength, cancellationToken);
+    }
+
+    public async Task LoadChunkAsync(ReplayTimeline timeline, DateTimeOffset chunkStart, TimeSpan chunkLength, CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(timeline);
 
         TimeSpan remainingDuration = timeline.Duration - timeline.BufferedDuration;
@@ -51,7 +57,6 @@ public class ReplayLoader
         }
 
         chunkLength = TimeSpan.FromTicks(Math.Min(chunkLength.Ticks, remainingDuration.Ticks));
-        DateTimeOffset chunkStart = timeline.SessionStart + timeline.BufferedDuration;
 
         ReplayDataChunk chunk = await _sessionDataService.LoadReplayChunk(
             timeline.SessionKey,
@@ -59,7 +64,7 @@ public class ReplayLoader
             chunkLength,
             cancellationToken);
 
-        _replayBuilder.AppendChunk(timeline, chunk);
+        _replayBuilder.AddChunk(timeline, chunk);
     }
 }
 
