@@ -280,7 +280,7 @@ public class MainViewModel : BindableBase, IDisposable
         Playback.RefreshBufferedDuration();
         Playback.RefreshCurrentPosition();
         Playback.ResumeAfterBuffering();
-        StatusText = $"Buffered {_timeline.BufferedDuration:hh\\:mm\\:ss} of " + $"{_timeline.Duration:hh\\:mm\\:ss}.";
+        StatusText = BuildBufferStatus(_timeline, TimeSpan.FromSeconds(Playback.CurrentTimeSeconds));
     }
 
     private void OnSelectedDriverChanged(object? sender, EventArgs eventArgs)
@@ -309,6 +309,21 @@ public class MainViewModel : BindableBase, IDisposable
             $"Managed heap: {ToMb(managedBytes):0.0} MB, " +
             $"Working set: {ToMb(process.WorkingSet64):0.0} MB, " +
             $"Private memory: {ToMb(process.PrivateMemorySize64):0.0} MB";
+    }
+
+    private static string BuildBufferStatus(ReplayTimeline timeline, TimeSpan playbackPosition)
+    {
+        DateTimeOffset playbackTime = timeline.SessionStart + playbackPosition;
+
+        if (timeline.TryGetBufferedRange(playbackTime, out ReplayBufferRange? range))
+        {
+            TimeSpan rangeStart = range!.Start - timeline.SessionStart;
+            TimeSpan rangeEnd = range.End - timeline.SessionStart;
+
+            return $"Buffered replay data from {rangeStart:hh\\:mm\\:ss} to {rangeEnd:hh\\:mm\\:ss}.";
+        }
+
+        return $"Buffered {timeline.LoadedRanges.Count} replay section(s).";
     }
 
     private static bool TryParseSessionKey(string text, out SessionKey sessionKey, out string? errorMessage)
