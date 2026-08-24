@@ -220,7 +220,7 @@ public class DriverReplayStream
         
         return new DriverReplayState(
             DriverNumber,
-            Position: SampleLatest(Positions, timestamp, position => position.Timestamp, rangeStart)?.Position,
+            Position: SampleLatest(Positions, timestamp, position => position.Timestamp, DateTimeOffset.MinValue)?.Position,
             Location: SampleInterpolatedLocation(
                 Locations,
                 _locationLastMovementTimestamps,

@@ -123,18 +123,9 @@ public class SessionDataService
                     Filter.LessThan(LocationFields.Timestamp, chunkEnd)
                 ]));
 
-        Task<IReadOnlyList<OpenF1PositionUpdate>> positionUpdatesTask = FetchChunks(
-          "positions",
-          chunkStart,
-          chunkEnd,
-          (chunkStart, chunkEnd) => _client.GetPositionsAsync(
-              cancellationToken: cancellationToken,
-              sessionKey: sessionKey,
-              extraFilters:
-              [
-                  Filter.GreaterThanOrEqual(PositionFields.Timestamp, chunkStart),
-                  Filter.LessThan(PositionFields.Timestamp, chunkEnd)
-              ]));
+        Task<IReadOnlyList<OpenF1PositionUpdate>> positionUpdatesTask = _client.GetPositionsAsync(
+            cancellationToken: cancellationToken,
+            sessionKey: sessionKey);
 
         Task<IReadOnlyList<OpenF1CarTelemetrySample>> carTelemetryTask = FetchChunks(
             "car telemetry",
@@ -211,19 +202,6 @@ public class SessionDataService
                     Filter.LessThan(LocationFields.Timestamp, chunkEnd)
                 ]));
 
-        Task<IReadOnlyList<OpenF1PositionUpdate>> positionUpdatesTask = FetchChunks(
-            "positions",
-            chunkStart,
-            chunkEnd,
-            (chunkStart, chunkEnd) => _client.GetPositionsAsync(
-                cancellationToken: cancellationToken,
-                sessionKey: sessionKey,
-                extraFilters:
-                [
-                    Filter.GreaterThanOrEqual(PositionFields.Timestamp, chunkStart),
-                    Filter.LessThan(PositionFields.Timestamp, chunkEnd)
-                ]));
-
         Task<IReadOnlyList<OpenF1CarTelemetrySample>> carTelemetryTask = FetchChunks(
             "car telemetry",
             chunkStart,
@@ -253,14 +231,13 @@ public class SessionDataService
 
         await Task.WhenAll(
             locationsTask,
-            positionUpdatesTask,
             carTelemetryTask,
             intervalsTask);
 
         return new ReplayDataChunk(
             session,
             await locationsTask,
-            await positionUpdatesTask,
+            [],
             await carTelemetryTask,
             await intervalsTask,
             chunkStart,

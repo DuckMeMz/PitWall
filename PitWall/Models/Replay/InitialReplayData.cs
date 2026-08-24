@@ -19,7 +19,7 @@ public record InitialReplayData(
     OpenF1Session Session, //Non-Buffered
     IReadOnlyList<OpenF1Driver> Drivers, //Non-Buffered
     IReadOnlyList<OpenF1Location> Locations, //Buffered 
-    IReadOnlyList<OpenF1PositionUpdate> Positions, //Buffered
+    IReadOnlyList<OpenF1PositionUpdate> Positions, //Non-Buffered
     IReadOnlyList<OpenF1CarTelemetrySample> CarTelemetry, //Buffered
     IReadOnlyList<OpenF1IntervalSample> Intervals, //Buffered
     IReadOnlyList<OpenF1Lap> Laps, //Non-Buffered
