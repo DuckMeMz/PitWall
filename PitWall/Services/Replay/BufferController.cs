@@ -8,7 +8,6 @@ public class BufferController
     private readonly ReplayBufferSettings _settings;
     private CancellationTokenSource? _cancellationTokenSource;
     private bool _isBuffering;
-    private TimeSpan? _lastAttemptedBufferEnd;
 
     public BufferController(ReplayLoader replayLoader, ReplayBufferSettings settings)
     {
@@ -30,7 +29,6 @@ public class BufferController
         _cancellationTokenSource?.Dispose();
         _cancellationTokenSource = null;
         _isBuffering = false;
-        _lastAttemptedBufferEnd = null;
     }
 
     public bool BufferAheadIfNeeded(ReplayTimeline timeline, TimeSpan playbackPosition, bool isPlaying)
@@ -98,7 +96,10 @@ public class BufferController
         return true;
     }
 
-    private async Task BufferChunkAsync(ReplayTimeline timeline, DateTimeOffset chunkStart, CancellationToken cancellationToken)
+    private async Task BufferChunkAsync(
+        ReplayTimeline timeline,
+        DateTimeOffset chunkStart,
+        CancellationToken cancellationToken)
     {
         Exception? failure = null;
 

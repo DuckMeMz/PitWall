@@ -129,6 +129,8 @@ public class PlaybackViewModel : BindableBase, IDisposable
     public string CurrentTimeText => FormatTime(TimeSpan.FromSeconds(CurrentTimeSeconds));
     public string DurationText => FormatTime(TimeSpan.FromSeconds(DurationSeconds));
     public string PlayPauseText => IsPlaying ? "Pause" : "Play";
+    public IReadOnlyList<ReplayBufferRange> LoadedRanges => _timeline?.LoadedRanges.ToArray() ?? [];
+    public DateTimeOffset SessionStart => _timeline?.SessionStart ?? default;
 
     public string FrameText => 
         _timeline is null
@@ -143,6 +145,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
         _timeline = timeline;
         DurationSeconds = timeline.Duration.TotalSeconds;
         RefreshBufferedDuration();
+        OnPropertyChanged(nameof(SessionStart));
         OnPropertyChanged(nameof(FrameText));
         ApplyPosition(TimeSpan.Zero, forceNotification: true);
     }
@@ -154,6 +157,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
         DurationSeconds = 0;
         SetCurrentTimeSeconds(0);
         RefreshBufferedDuration();
+        OnPropertyChanged(nameof(SessionStart));
         OnPropertyChanged(nameof(FrameText));
     }
 
@@ -161,6 +165,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
     {
         OnPropertyChanged(nameof(BufferedDuration));
         OnPropertyChanged(nameof(BufferedSeconds));
+        OnPropertyChanged(nameof(LoadedRanges));
     }
 
     public void RefreshCurrentPosition()
@@ -353,6 +358,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
 
         _currentTimeSeconds = value;
         OnPropertyChanged(nameof(CurrentTimeSeconds));
+        OnPropertyChanged(nameof(ScrubTimeSeconds));
         OnPropertyChanged(nameof(CurrentTimeText));
         OnPropertyChanged(nameof(FrameText));
         return true;
