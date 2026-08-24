@@ -7,36 +7,70 @@ public class ReplayLoader
 {
     private readonly SessionDataService _sessionDataService;
     private readonly ReplayBuilder _replayBuilder;
+    private readonly ReplayBufferSettings _settings;
 
-    public ReplayLoader(SessionDataService sessionDataService, ReplayBuilder replayBuilder)
+    public ReplayLoader(
+        SessionDataService sessionDataService,
+        ReplayBuilder replayBuilder,
+        ReplayBufferSettings settings)
     {
-        _sessionDataService = sessionDataService
-            ?? throw new ArgumentNullException(nameof(sessionDataService));
-        _replayBuilder = replayBuilder
-            ?? throw new ArgumentNullException(nameof(replayBuilder));
+        _sessionDataService = sessionDataService ?? throw new ArgumentNullException(nameof(sessionDataService));
+        _replayBuilder = replayBuilder ?? throw new ArgumentNullException(nameof(replayBuilder));
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     }
 
-    public async Task<ReplayLoadResult> LoadAsync(SessionKey sessionKey, CancellationToken cancellationToken = default)
+    public async Task<ReplayLoadResult> LoadInitialAsync(SessionKey sessionKey, CancellationToken cancellationToken = default)
     {
         Stopwatch loadTimer = Stopwatch.StartNew();
-        ReplayData replayData =
-            await _sessionDataService.LoadReplayDataAsync(sessionKey, cancellationToken);
+        InitialReplayData initialReplayData = await _sessionDataService.LoadInitialReplayChunk(
+            sessionKey, 
+            _settings.InitialChunkLength, 
+            cancellationToken);
 
         Stopwatch buildTimer = Stopwatch.StartNew();
-        ReplayTimeline timeline = _replayBuilder.BuildReplay(replayData);
+        ReplayTimeline timeline = _replayBuilder.BuildInitialTimeline(initialReplayData);
         buildTimer.Stop();
         loadTimer.Stop();
 
         return new ReplayLoadResult(
-            replayData,
+            initialReplayData,
             timeline,
             loadTimer.Elapsed,
             buildTimer.Elapsed);
     }
+
+    public async Task LoadNextChunkAsync(ReplayTimeline timeline, TimeSpan chunkLength, CancellationToken cancellationToken = default)
+    {
+        DateTimeOffset chunkStart = timeline.SessionStart + timeline.BufferedDuration;
+        await LoadChunkAsync(timeline, chunkStart, chunkLength, cancellationToken);
+    }
+
+    public async Task LoadChunkAsync(ReplayTimeline timeline, DateTimeOffset chunkStart, TimeSpan chunkLength, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(timeline);
+
+        DateTimeOffset sessionEnd = timeline.SessionStart + timeline.Duration;
+        TimeSpan remainingDuration = sessionEnd - chunkStart;
+
+        if (remainingDuration <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        chunkLength = TimeSpan.FromTicks(Math.Min(chunkLength.Ticks, remainingDuration.Ticks));
+
+        ReplayDataChunk chunk = await _sessionDataService.LoadReplayChunk(
+            timeline.SessionKey,
+            chunkStart,
+            chunkLength,
+            cancellationToken);
+
+        _replayBuilder.AddChunk(timeline, chunk);
+    }
 }
 
 public record ReplayLoadResult(
-    ReplayData Data,
+    InitialReplayData Data,
     ReplayTimeline Timeline,
     TimeSpan TotalElapsed,
     TimeSpan BuildElapsed);

@@ -100,28 +100,77 @@
                             Command="{Binding Playback.StopCommand}" />
                 </StackPanel>
 
-                <Grid Grid.Column="1"
+                <Grid x:Name="PlaybackTimeline" 
+                      Grid.Column="1"
                       Height="24">
 
-                    <ProgressBar
-                          Minimum="0"
-                          Maximum="{Binding Playback.DurationSeconds}"
-                          Value="{Binding Playback.BufferedSeconds, Mode=OneWay}"
-                          Height="5"
-                          VerticalAlignment="Center"
-                          Background="#2A3444"
-                          Foreground="#788391"
-                          BorderThickness="0"
-                          Panel.ZIndex="0"
-                          d:Value="75"/>
+                    <Border Height="5"
+                            VerticalAlignment="Center"
+                            Background="#2A3444"
+                            CornerRadius="2" />
 
+                    <ItemsControl ItemsSource="{Binding Playback.LoadedRanges}"
+                                  IsHitTestVisible="False"
+                                  Height="24"
+                                  HorizontalAlignment="Stretch"
+                                  Panel.ZIndex="0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas x:Name="BufferedRangesCanvas"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Canvas.Left">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource RangeStartToPixelsConverter}">
+                                            <Binding />
+                                            <Binding Path="DataContext.Playback.SessionStart"
+                                                     RelativeSource="{RelativeSource AncestorType=Window}" />
+                                            <Binding Path="DataContext.Playback.DurationSeconds"
+                                                     RelativeSource="{RelativeSource AncestorType=Window}" />
+                                            <Binding Path="ActualWidth"
+                                                     RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Height="5"
+                                        VerticalAlignment="Center"
+                                        Background="#788391"
+                                        CornerRadius="2">
+                                    <Border.Width>
+                                        <MultiBinding Converter="{StaticResource RangeStartToPixelsConverter}"
+                                                      ConverterParameter="Width">
+                                            <Binding />
+                                            <Binding Path="DataContext.Playback.SessionStart"
+                                                     RelativeSource="{RelativeSource AncestorType=Window}" />
+                                            <Binding Path="DataContext.Playback.DurationSeconds"
+                                                     RelativeSource="{RelativeSource AncestorType=Window}" />
+                                            <Binding Path="ActualWidth"
+                                                     RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                                        </MultiBinding>
+                                    </Border.Width>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                     
                     <Slider
                         Minimum="0"
                         Maximum="{Binding Playback.DurationSeconds}"
-                        Value="{Binding Playback.CurrentTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        Value="{Binding Playback.ScrubTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         Style="{StaticResource PlaybackSliderStyle}"
                         Panel.ZIndex="1"
                         VerticalAlignment="Center"
+                        PreviewMouseLeftButtonDown="OnPlaybackSliderMouseDown"
+                        PreviewMouseLeftButtonUp="OnPlaybackSliderMouseUp"
+                        LostMouseCapture="OnPlaybackSliderLostMouseCapture"
                         d:Value="2" />
 
                 </Grid>

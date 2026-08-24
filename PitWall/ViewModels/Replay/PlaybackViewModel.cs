@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using PitWall.Commands;
 using PitWall.Common;
 using PitWall.Models;
@@ -14,12 +15,15 @@ public class PlaybackViewModel : BindableBase, IDisposable
     private TimeSpan _playbackStartTime;
     private double _currentTimeSeconds;
     private double _durationSeconds;
-    private double _bufferedSeconds;
     private double _playbackSpeed = 1.0;
     private bool _isPlaying;
+    private bool _resumeWhenBuffered;
     private bool _isEnabled = true;
     private bool _isRendering;
     private bool _isDisposed;
+    private bool _isScrubbing;
+    private double _scrubTimeSeconds;
+
 
     public PlaybackViewModel()
     {
@@ -46,6 +50,24 @@ public class PlaybackViewModel : BindableBase, IDisposable
         }
     }
 
+    public double ScrubTimeSeconds
+    {
+        get => _isScrubbing ? _scrubTimeSeconds : CurrentTimeSeconds;
+
+        set
+        {
+            double clampedValue = ClampTimeSeconds(value);
+
+            if(_isScrubbing)
+            {
+                SetProperty(ref _scrubTimeSeconds, clampedValue);
+                return;
+            }
+
+            CurrentTimeSeconds = clampedValue;
+        }
+    }
+
     public double DurationSeconds
     {
         get => _durationSeconds;
@@ -57,17 +79,6 @@ public class PlaybackViewModel : BindableBase, IDisposable
             {
                 OnPropertyChanged(nameof(DurationText));
             }
-        }
-    }
-
-    public double BufferedSeconds
-    {
-        get => _bufferedSeconds;
-        private set
-        {
-            double boundedValue = double.IsFinite(value) ? Math.Max(0, value) : 0;
-
-            SetProperty(ref _bufferedSeconds, boundedValue);
         }
     }
 
@@ -86,6 +97,10 @@ public class PlaybackViewModel : BindableBase, IDisposable
             }
         }
     }
+
+    public TimeSpan BufferedDuration => _timeline?.BufferedDuration ?? TimeSpan.Zero;
+
+    public double BufferedSeconds => BufferedDuration.TotalSeconds;
 
     public bool IsPlaying
     {
@@ -114,6 +129,8 @@ public class PlaybackViewModel : BindableBase, IDisposable
     public string CurrentTimeText => FormatTime(TimeSpan.FromSeconds(CurrentTimeSeconds));
     public string DurationText => FormatTime(TimeSpan.FromSeconds(DurationSeconds));
     public string PlayPauseText => IsPlaying ? "Pause" : "Play";
+    public IReadOnlyList<ReplayBufferRange> LoadedRanges => _timeline?.LoadedRanges.ToArray() ?? [];
+    public DateTimeOffset SessionStart => _timeline?.SessionStart ?? default;
 
     public string FrameText => 
         _timeline is null
@@ -127,6 +144,8 @@ public class PlaybackViewModel : BindableBase, IDisposable
         Pause();
         _timeline = timeline;
         DurationSeconds = timeline.Duration.TotalSeconds;
+        RefreshBufferedDuration();
+        OnPropertyChanged(nameof(SessionStart));
         OnPropertyChanged(nameof(FrameText));
         ApplyPosition(TimeSpan.Zero, forceNotification: true);
     }
@@ -137,9 +156,36 @@ public class PlaybackViewModel : BindableBase, IDisposable
         _timeline = null;
         DurationSeconds = 0;
         SetCurrentTimeSeconds(0);
+        RefreshBufferedDuration();
+        OnPropertyChanged(nameof(SessionStart));
         OnPropertyChanged(nameof(FrameText));
     }
 
+    public void RefreshBufferedDuration()
+    {
+        OnPropertyChanged(nameof(BufferedDuration));
+        OnPropertyChanged(nameof(BufferedSeconds));
+        OnPropertyChanged(nameof(LoadedRanges));
+    }
+
+    public void RefreshCurrentPosition()
+    {
+        ApplyPosition(TimeSpan.FromSeconds(CurrentTimeSeconds), true);
+    }
+
+    public void ResumeAfterBuffering()
+    {
+        if (!_resumeWhenBuffered || !HasReplay || !_timeline!.IsTimeBuffered(TimeSpan.FromSeconds(CurrentTimeSeconds)))
+        {
+            return;
+        }
+
+        _resumeWhenBuffered = false;
+        _playbackStartTime = TimeSpan.FromSeconds(CurrentTimeSeconds);
+        _playbackClock.Restart();
+        StartRendering();
+        IsPlaying = true;
+    }
     public void Stop()
     {
         Pause();
@@ -156,6 +202,33 @@ public class PlaybackViewModel : BindableBase, IDisposable
         _isDisposed = true;
         StopRendering();
         _playbackClock.Stop();
+    }
+
+    public void BeginScrubbing()
+    {
+        _isScrubbing = true;
+        _scrubTimeSeconds = CurrentTimeSeconds;
+    }
+
+    public void CommitScrub()
+    {
+        if(!_isScrubbing)
+        {
+            return;
+        }
+
+        _isScrubbing = false;
+
+        CurrentTimeSeconds = _scrubTimeSeconds;
+        OnPropertyChanged(nameof(ScrubTimeSeconds));
+    }
+
+    public void WaitForBuffer(bool resumeWhenBuffered)
+    {
+        StopRendering();
+        _playbackClock.Stop();
+        _resumeWhenBuffered = resumeWhenBuffered;
+        IsPlaying = false;
     }
 
     private bool HasReplay => _timeline is not null && _timeline.DriverCount > 0;
@@ -188,7 +261,13 @@ public class PlaybackViewModel : BindableBase, IDisposable
     {
         StopRendering();
         _playbackClock.Stop();
+        _resumeWhenBuffered = false;
         IsPlaying = false;
+    }
+
+    private void PauseForBuffer()
+    {
+        WaitForBuffer(resumeWhenBuffered: true);
     }
 
     private void StartRendering()
@@ -215,14 +294,25 @@ public class PlaybackViewModel : BindableBase, IDisposable
 
     private void OnRendering(object? sender, EventArgs e)
     {
+        if (_timeline is not ReplayTimeline timeline)
+        {
+            return;
+        }
+
         TimeSpan scaledElapsed = TimeSpan.FromTicks((long)(_playbackClock.Elapsed.Ticks * PlaybackSpeed));
         TimeSpan targetTime = _playbackStartTime + scaledElapsed;
-        TimeSpan duration = TimeSpan.FromSeconds(DurationSeconds);
 
-        if (targetTime >= duration)
+        if (targetTime >= timeline.Duration)
         {
-            SeekTo(duration, resetPlaybackClock: false);
+            SeekTo(timeline.Duration, resetPlaybackClock: false);
             Pause();
+            return;
+        }
+
+        if (!timeline.IsTimeBuffered(targetTime))
+        {
+            SeekTo(targetTime, resetPlaybackClock: false);
+            PauseForBuffer();
             return;
         }
 
@@ -268,6 +358,7 @@ public class PlaybackViewModel : BindableBase, IDisposable
 
         _currentTimeSeconds = value;
         OnPropertyChanged(nameof(CurrentTimeSeconds));
+        OnPropertyChanged(nameof(ScrubTimeSeconds));
         OnPropertyChanged(nameof(CurrentTimeText));
         OnPropertyChanged(nameof(FrameText));
         return true;

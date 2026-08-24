@@ -11,10 +11,16 @@ public class TrackMapViewModel : BindableBase
 {
     private static readonly TimeSpan MarkerStaleAfter = TimeSpan.FromSeconds(30);
 
+    private readonly TrackMapLoader _trackMapLoader;
     private readonly Dictionary<DriverNumber, ReplayMapMarker> _markersByDriver = new();
     private TrackMapProjector _projector = TrackMapProjector.Empty;
     private string _trackTitle = "No session loaded";
     private PointCollection _trackPath = new();
+
+    public TrackMapViewModel(TrackMapLoader trackMapLoader)
+    {
+        _trackMapLoader = trackMapLoader ?? throw new ArgumentNullException(nameof(trackMapLoader));
+    }
 
     public ObservableCollection<ReplayMapMarker> MapMarkers { get; } = new();
 
@@ -30,14 +36,16 @@ public class TrackMapViewModel : BindableBase
         private set => SetProperty(ref _trackPath, value);
     }
 
-    public void Load(ReplayData replayData)
+    public async Task InitialiseAsync(InitialReplayData replayData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(replayData);
 
         Clear();
-        _projector = TrackMapProjector.FromLocations(replayData.Locations);
-        TrackTitle = GetTrackTitle(replayData);
-        TrackMapPath = BuildTrackPath(replayData);
+        TrackMapData mapData = await _trackMapLoader.LoadAsync(replayData, cancellationToken);
+
+        _projector = TrackMapProjector.FromLocations(mapData.CircuitLocations);
+        TrackTitle = mapData.Title;
+        TrackMapPath = BuildTrackPath(mapData.CircuitLocations);
 
         foreach (OpenF1Driver driver in replayData.Drivers
             .OrderBy(driver => driver.DriverNumber.Value))
@@ -97,11 +105,16 @@ public class TrackMapViewModel : BindableBase
         _markersByDriver.Clear();
     }
 
-    private PointCollection BuildTrackPath(ReplayData replayData)
+    private PointCollection BuildTrackPath(IReadOnlyList<OpenF1Location> circuitLocations)
     {
         PointCollection path = new();
 
-        foreach (OpenF1Location location in FindValidLapLocations(replayData))
+        foreach (OpenF1Location location in circuitLocations
+            .Where(location =>
+                location.Timestamp.HasValue &&
+                location.X.HasValue &&
+                location.Y.HasValue)
+            .OrderBy(location => location.Timestamp))
         {
             if (!_projector.TryProject(
                 location.X,
@@ -126,64 +139,5 @@ public class TrackMapViewModel : BindableBase
 
         path.Freeze();
         return path;
-    }
-
-    private static string GetTrackTitle(ReplayData replayData)
-    {
-        return
-            replayData.Meeting?.CircuitShortName ??
-            replayData.Session.CircuitShortName ??
-            replayData.Meeting?.MeetingName ??
-            replayData.Session.Location ??
-            "Track map";
-    }
-
-    private static IReadOnlyList<OpenF1Location> FindValidLapLocations(
-        ReplayData replayData)
-    {
-        Dictionary<DriverNumber, OpenF1Location[]> locationsByDriver =
-            replayData.Locations
-                .Where(location =>
-                    location.Timestamp.HasValue &&
-                    location.X.HasValue &&
-                    location.Y.HasValue)
-                .GroupBy(location => location.DriverNumber)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group
-                        .OrderBy(location => location.Timestamp)
-                        .ToArray());
-
-        foreach (OpenF1Lap lap in replayData.Laps
-            .Where(lap =>
-                lap.TimestampStart.HasValue &&
-                lap.LapDuration is > 0 &&
-                lap.IsPitOutLap is not true)
-            .OrderBy(lap => lap.LapDuration))
-        {
-            if (!locationsByDriver.TryGetValue(
-                lap.DriverNumber,
-                out OpenF1Location[]? driverLocations))
-            {
-                continue;
-            }
-
-            DateTimeOffset lapStart = lap.TimestampStart!.Value;
-            DateTimeOffset lapEnd = lapStart + TimeSpan.FromSeconds(lap.LapDuration!.Value);
-            OpenF1Location[] lapLocations = driverLocations
-                .Where(location =>
-                    location.Timestamp >= lapStart &&
-                    location.Timestamp <= lapEnd)
-                .ToArray();
-
-            if (lapLocations.Length >= 20)
-            {
-                return lapLocations;
-            }
-        }
-
-        return locationsByDriver.Values
-            .OrderByDescending(locations => locations.Length)
-            .FirstOrDefault() ?? [];
     }
 }

@@ -15,6 +15,7 @@ public class OpenF1APIService
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl = "https://api.openf1.org/v1/";
     private readonly ResiliencePipeline<HttpResponseMessage> _pipeline;
+    private int _requestId;
 
     public OpenF1APIService(HttpClient httpClient)
     {
@@ -38,6 +39,12 @@ public class OpenF1APIService
             permitLimit: 3,
             window: TimeSpan.FromSeconds(1),
             segmentsPerWindow: 10))
+        .AddConcurrencyLimiter(new ConcurrencyLimiterOptions
+        {
+            PermitLimit = 2,
+            QueueLimit = 100,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+        })
         .Build();
     }
 
@@ -45,11 +52,41 @@ public class OpenF1APIService
     {
         string finalUrl = $"{_baseUrl}{parameters.GetRelativeUrl()}";
 
-        Debug.WriteLine($"Fetching: {finalUrl}");
+        int requestId = Interlocked.Increment(ref _requestId);
+        int attempt = 0;
+        Stopwatch totalTimer = Stopwatch.StartNew();
+
 
         using HttpResponseMessage response = await _pipeline.ExecuteAsync(
-            async token => await _httpClient.GetAsync(finalUrl, token),
-            cancellationToken);
+        async token =>
+        {
+            int currentAttempt = Interlocked.Increment(ref attempt);
+            Stopwatch networkTimer = Stopwatch.StartNew();
+
+            Debug.WriteLine($"[{requestId}] SENT attempt {currentAttempt} {finalUrl}");
+
+            try
+            {
+                HttpResponseMessage result =
+                    await _httpClient.GetAsync(finalUrl, token);
+
+                Debug.WriteLine(
+                    $"[{requestId}] RESPONSE {(int)result.StatusCode} " +
+                    $"network={networkTimer.ElapsedMilliseconds}ms " +
+                    $"total={totalTimer.ElapsedMilliseconds}ms");
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"[{requestId}] FAILED attempt {currentAttempt} " +
+                    $"{ex.GetType().Name}: {ex.Message}");
+
+                throw;
+            }
+        },
+        cancellationToken);
 
         string json = await response.Content.ReadAsStringAsync(cancellationToken);
 

@@ -9,10 +9,9 @@ public class SessionDataService
 {
     private readonly OpenF1Client _client;
 
-    private bool replayInitialised = false;
-    private OpenF1Session? currentSession = null;
-    private OpenF1Meeting? currentMeeting = null;
-    private IReadOnlyList<OpenF1Driver>? currentDrivers = null;
+    private bool _replayInitialised;
+    private OpenF1Session? _currentSession;
+    private OpenF1Meeting? _currentMeeting;
 
     public SessionDataService(OpenF1Client client)
     {
@@ -70,20 +69,17 @@ public class SessionDataService
         }
     }
 
-    public async Task<ReplayData> LoadInitalReplayChunk(SessionKey sessionKey, TimeSpan chunkLength, CancellationToken cancellationToken)
+    public async Task<InitialReplayData> LoadInitialReplayChunk(SessionKey sessionKey, TimeSpan chunkLength, CancellationToken cancellationToken)
     {
         //Non-Buffered Data
 
-        currentSession = await GetSingleSession(sessionKey, cancellationToken);
+        _currentSession = await GetSingleSession(sessionKey, cancellationToken);
 
-        currentDrivers = await _client.GetDriversAsync(
+        IReadOnlyList<OpenF1Driver> drivers = await _client.GetDriversAsync(
            cancellationToken: cancellationToken,
            sessionKey: sessionKey);
 
-        OpenF1Session session = currentSession
-            ?? throw new InvalidOperationException("The replay has not been initialized.");
-
-        IReadOnlyList<OpenF1Driver> drivers = currentDrivers
+        OpenF1Session session = _currentSession
             ?? throw new InvalidOperationException("The replay has not been initialized.");
 
 
@@ -114,50 +110,37 @@ public class SessionDataService
 
         DateTimeOffset chunkEnd = chunkStart + chunkLength;
 
-        Task<IReadOnlyList<OpenF1Location>> locationsTask = FetchDriverDataChunk(
-            drivers,
+        Task<IReadOnlyList<OpenF1Location>> locationsTask = FetchChunks(
             "locations",
             chunkStart,
             chunkEnd,
-            (driverNumber, chunkStart, chunkEnd) => _client.GetLocationsAsync(
+            (chunkStart, chunkEnd) => _client.GetLocationsAsync(
                 cancellationToken: cancellationToken,
                 sessionKey: sessionKey,
-                driverNumber: driverNumber,
                 extraFilters:
                 [
                     Filter.GreaterThanOrEqual(LocationFields.Timestamp, chunkStart),
                     Filter.LessThan(LocationFields.Timestamp, chunkEnd)
                 ]));
 
-        Task<IReadOnlyList<OpenF1PositionUpdate>> positionUpdatesTask = FetchSessionChunks(
-          "positions",
-          chunkStart,
-          chunkEnd,
-          (chunkStart, chunkEnd) => _client.GetPositionsAsync(
-              cancellationToken: cancellationToken,
-              sessionKey: sessionKey,
-              extraFilters:
-              [
-                  Filter.GreaterThanOrEqual(PositionFields.Timestamp, chunkStart),
-                  Filter.LessThan(PositionFields.Timestamp, chunkEnd)
-              ]));
+        Task<IReadOnlyList<OpenF1PositionUpdate>> positionUpdatesTask = _client.GetPositionsAsync(
+            cancellationToken: cancellationToken,
+            sessionKey: sessionKey);
 
-        Task<IReadOnlyList<OpenF1CarTelemetrySample>> carTelemetryTask = FetchDriverDataChunk(
-            drivers,
+        Task<IReadOnlyList<OpenF1CarTelemetrySample>> carTelemetryTask = FetchChunks(
             "car telemetry",
             chunkStart,
             chunkEnd,
-            (driverNumber, chunkStart, chunkEnd) => _client.GetCarTelemetryAsync(
+            (chunkStart, chunkEnd) => _client.GetCarTelemetryAsync(
                 cancellationToken: cancellationToken,
                 sessionKey: sessionKey,
-                driverNumber: driverNumber,
                 extraFilters:
                 [
                     Filter.GreaterThanOrEqual(CarTelemetrySampleFields.Timestamp, chunkStart),
                     Filter.LessThan(CarTelemetrySampleFields.Timestamp, chunkEnd)
                 ]));
 
-        Task<IReadOnlyList<OpenF1IntervalSample>> intervalsTask = FetchSessionChunks(
+        Task<IReadOnlyList<OpenF1IntervalSample>> intervalsTask = FetchChunks(
            "intervals",
            chunkStart,
            chunkEnd,
@@ -178,11 +161,11 @@ public class SessionDataService
            intervalsTask,
            lapsTask);
 
-        currentMeeting = (await meetingTask).FirstOrDefault();
+        _currentMeeting = (await meetingTask).FirstOrDefault();
 
-        replayInitialised = true;
+        _replayInitialised = true;
 
-        return new ReplayData(
+        return new InitialReplayData(
             session,
             drivers,
             await locationsTask,
@@ -191,68 +174,48 @@ public class SessionDataService
             await intervalsTask,
             await lapsTask,
             chunkLength,
-            currentMeeting);
+            _currentMeeting);
     }
 
     public async Task<ReplayDataChunk> LoadReplayChunk(SessionKey sessionKey, DateTimeOffset chunkStart, TimeSpan chunkLength, CancellationToken cancellationToken = default)
     {
-        if (!replayInitialised || currentSession is null || currentSession!.SessionKey != sessionKey)
+        if (!_replayInitialised || _currentSession is null || _currentSession!.SessionKey != sessionKey)
         {
             throw new InvalidOperationException($"LoadInitialReplayChunk must be called before loading more replay chunks");
         }
 
-        OpenF1Session session = currentSession
-            ?? throw new InvalidOperationException("The replay has not been initialized.");
-
-        IReadOnlyList<OpenF1Driver> drivers = currentDrivers
+        OpenF1Session session = _currentSession
             ?? throw new InvalidOperationException("The replay has not been initialized.");
 
         DateTimeOffset chunkEnd = chunkStart + chunkLength;
 
-        Task<IReadOnlyList<OpenF1Location>> locationsTask = FetchDriverDataChunk(
-            drivers,
+        Task<IReadOnlyList<OpenF1Location>> locationsTask = FetchChunks(
             "locations",
             chunkStart,
             chunkEnd,
-            (driverNumber, chunkStart, chunkEnd) => _client.GetLocationsAsync(
+            (chunkStart, chunkEnd) => _client.GetLocationsAsync(
                 cancellationToken: cancellationToken,
                 sessionKey: sessionKey,
-                driverNumber: driverNumber,
                 extraFilters:
                 [
                     Filter.GreaterThanOrEqual(LocationFields.Timestamp, chunkStart),
                     Filter.LessThan(LocationFields.Timestamp, chunkEnd)
                 ]));
 
-        Task<IReadOnlyList<OpenF1PositionUpdate>> positionUpdatesTask = FetchSessionChunks(
-            "positions",
-            chunkStart,
-            chunkEnd,
-            (chunkStart, chunkEnd) => _client.GetPositionsAsync(
-                cancellationToken: cancellationToken,
-                sessionKey: sessionKey,
-                extraFilters:
-                [
-                    Filter.GreaterThanOrEqual(PositionFields.Timestamp, chunkStart),
-                    Filter.LessThan(PositionFields.Timestamp, chunkEnd)
-                ]));
-
-        Task<IReadOnlyList<OpenF1CarTelemetrySample>> carTelemetryTask = FetchDriverDataChunk(
-            drivers,
+        Task<IReadOnlyList<OpenF1CarTelemetrySample>> carTelemetryTask = FetchChunks(
             "car telemetry",
             chunkStart,
             chunkEnd,
-            (driverNumber, chunkStart, chunkEnd) => _client.GetCarTelemetryAsync(
+            (chunkStart, chunkEnd) => _client.GetCarTelemetryAsync(
                 cancellationToken: cancellationToken,
                 sessionKey: sessionKey,
-                driverNumber: driverNumber,
                 extraFilters:
                 [
                     Filter.GreaterThanOrEqual(CarTelemetrySampleFields.Timestamp, chunkStart),
                     Filter.LessThan(CarTelemetrySampleFields.Timestamp, chunkEnd)
                 ]));
 
-        Task<IReadOnlyList<OpenF1IntervalSample>> intervalsTask = FetchSessionChunks(
+        Task<IReadOnlyList<OpenF1IntervalSample>> intervalsTask = FetchChunks(
             "intervals",
             chunkStart,
             chunkEnd,
@@ -268,21 +231,63 @@ public class SessionDataService
 
         await Task.WhenAll(
             locationsTask,
-            positionUpdatesTask,
             carTelemetryTask,
             intervalsTask);
 
         return new ReplayDataChunk(
             session,
             await locationsTask,
-            await positionUpdatesTask,
+            [],
             await carTelemetryTask,
             await intervalsTask,
             chunkStart,
             chunkLength,
-            currentMeeting);
+            _currentMeeting);
+    }
+    public async Task<IReadOnlyList<OpenF1Location>> GetLapLocationsAsync(OpenF1Lap lap, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(lap);
+
+        DateTimeOffset lapStart = lap.TimestampStart ?? throw new InvalidOperationException("The lap has no start time.");
+
+        double lapDurationSeconds = lap.LapDuration ?? throw new InvalidOperationException("The lap has no duration.");
+
+        DateTimeOffset lapEnd = lapStart + TimeSpan.FromSeconds(lapDurationSeconds);
+
+
+        IReadOnlyList<OpenF1Location> locations = await _client.GetLocationsAsync(
+            cancellationToken,
+            lap.SessionKey,
+            lap.DriverNumber,
+            lap.MeetingKey,
+            Filter.GreaterThanOrEqual(LocationFields.Timestamp, lapStart),
+            Filter.LessThan(LocationFields.Timestamp, lapEnd)
+            );
+
+        return locations;
     }
 
+    public async Task<IReadOnlyList<OpenF1Lap>> GetQualifyingLapsAsync(
+        MeetingKey meetingKey,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<OpenF1Session> sessions = await _client.GetSessionsAsync(
+            cancellationToken: cancellationToken,
+            meetingKey: meetingKey);
+
+        OpenF1Session? qualifyingSession = sessions.FirstOrDefault(session =>
+            session.SessionType == SessionType.Qualifying &&
+            session.IsCancelled is not true);
+
+        if (qualifyingSession is null)
+        {
+            return [];
+        }
+
+        return await _client.GetLapsAsync(
+            cancellationToken: cancellationToken,
+            sessionKey: qualifyingSession.SessionKey);
+    }
     private static async Task<IReadOnlyList<T>> TryFetch<T>(
         string streamName,
         Func<Task<IReadOnlyList<T>>> fetchAsync)
@@ -298,29 +303,7 @@ public class SessionDataService
         }
     }
 
-    //Used for fetching data per driver such as locations or car telementry
-    private static async Task<IReadOnlyList<T>> FetchDriverDataChunk<T>(
-        IReadOnlyList<OpenF1Driver> drivers,
-        string streamName,
-        DateTimeOffset chunkStart,
-        DateTimeOffset chunkEnd,
-        Func<DriverNumber, DateTimeOffset, DateTimeOffset, Task<IReadOnlyList<T>>> fetchChunkAsync)
-    {
-        Task<IReadOnlyList<T>>[] tasks = drivers
-            .Select(driver => TryFetch(
-                $"{streamName} for driver {driver.DriverNumber.Value}",
-                () => fetchChunkAsync(driver.DriverNumber, chunkStart, chunkEnd)))
-            .ToArray();
-
-        IReadOnlyList<T>[] results = await Task.WhenAll(tasks);
-
-        return results
-            .SelectMany(stream => stream)
-            .ToList();
-    }
-
-    //Used for session feeds such as positions, intervals, laps or race control.
-    private static async Task<IReadOnlyList<T>> FetchSessionChunks<T>(
+    private static async Task<IReadOnlyList<T>> FetchChunks<T>(
         string streamName,
         DateTimeOffset chunkStart,
         DateTimeOffset chunkEnd,
