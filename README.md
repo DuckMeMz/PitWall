@@ -4,8 +4,6 @@
 ![WPF](https://img.shields.io/badge/UI-WPF-0C54C2)
 ![Status](https://img.shields.io/badge/Status-Work%20In%20Progress-F59E0B)
 
-> ⚠️ **Known issue:** OpenF1 now rejects the large data requests used by the stable release, so race replays will fail to load. The buffered-loading features that fixes this is available in the [v0.2.0-beta prerelease](https://github.com/DuckMeMz/PitWall/releases/tag/v0.2.0-beta.2).; it is the recommended version for now.
-
 PitWall is a work-in-progress Windows desktop application that turns [OpenF1](https://openf1.org/docs/) session data into an interactive Formula 1 replay.
 
 Load a session, move through its timeline, follow the cars on the circuit map, and inspect timing and telemetry for each driver.
@@ -39,7 +37,7 @@ dotnet run --project PitWall/PitWall.csproj
 ## Load a replay
 
 1. You can use the session finder to easily search race weekends. Alternatively, you can use `latest` or an OpenF1 `session key` to manually search for races. (Some session keys suggestions below)
-2. Select **Load** and wait for the session data to be processed. See [current limitations](#current-limitations).
+2. Select **Load** and wait for the session data to be processed.
 3. Use the playback controls and timeline to explore the session.
 4. Select a driver in the timing table to focus their marker and telemetry.
 
@@ -56,7 +54,6 @@ dotnet run --project PitWall/PitWall.csproj
 
 ## Current limitations
 
-- A session is downloaded and held in memory before playback begins, so large sessions can take time to load (up to around 80 seconds)
 - There is no local cache yet; loading the same session repeats the API requests.
 - Driver location may be inaccurate; depends on the completeness and timing of the source data.
 - A session displays all of the data including before and after the race, where many cars may be stationary.
@@ -64,10 +61,12 @@ dotnet run --project PitWall/PitWall.csproj
 
 ## Roadmap
 
-- [ ] Add buffered and chunked loading to reduce startup time and memory usage.
+- [x] Add buffered and chunked loading to reduce startup time and memory usage.
 - [ ] Add a SQLite cache for downloaded session data.
 - [x] Build a session finder so users can browse events instead of looking up session keys.
 - [ ] Display race-control messages on the replay timeline.
 - [ ] Add synchronised team-radio playback.
 - [ ] Create a custom graph data section, so users can combine and view chosen data.
 - [ ] Continue improving the UI, loading feedback, and error handling.
+
+Read more on my [portfolio](https://danfarnham.dev/project/pitwall).
